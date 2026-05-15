@@ -1,0 +1,1732 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>内勤管理ページ｜サクラムーンG</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&family=Quicksand:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --pink:      #FF8FAB;
+  --pink-mid:  #FFB3C6;
+  --pink-soft: #FFE8F0;
+  --pink-bg:   #FFF5F8;
+  --yellow:    #FFD966;
+  --yellow-soft:#FFF8D6;
+  --mint:      #7DD8B0;
+  --mint-soft: #E6FAF2;
+  --lav:       #C4AAEE;
+  --lav-soft:  #F0EAFF;
+  --red:       #FF5A7A;
+  --text:      #2E1F28;
+  --text2:     #7A6070;
+  --border:    #EDD5DF;
+  --bg:        #FDF7F9;
+  --white:     #FFFFFF;
+  --sidebar-w: 260px;
+  --header-h:  56px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* ===== LAYOUT ===== */
+.layout{display:flex;height:100vh;overflow:hidden;}
+
+/* SIDEBAR */
+.sidebar{
+  width:var(--sidebar-w);flex-shrink:0;
+  background:var(--white);border-right:1.5px solid var(--border);
+  display:flex;flex-direction:column;height:100vh;
+  box-shadow:2px 0 12px rgba(255,143,171,.08);
+}
+.sidebar-header{
+  padding:16px;border-bottom:1.5px solid var(--border);
+  background:linear-gradient(135deg,var(--pink) 0%,#FF6B9D 100%);
+}
+.sidebar-logo{
+  font-family:'Quicksand',sans-serif;
+  font-size:13px;letter-spacing:2px;color:rgba(255,255,255,.8);margin-bottom:2px;
+}
+.sidebar-title{font-size:16px;font-weight:900;color:#fff;}
+.sidebar-sub{font-size:11px;color:rgba(255,255,255,.7);margin-top:2px;}
+
+.sidebar-search{padding:12px;}
+.search-input{
+  width:100%;background:var(--pink-bg);
+  border:1.5px solid var(--border);border-radius:10px;
+  padding:8px 12px;font-size:13px;color:var(--text);
+  font-family:inherit;outline:none;transition:border-color .2s;
+}
+.search-input:focus{border-color:var(--pink);}
+.search-input::placeholder{color:var(--text2);font-size:12px;}
+
+.sidebar-list{flex:1;overflow-y:auto;padding:0 8px 16px;}
+.sidebar-section{
+  font-size:10px;font-weight:700;letter-spacing:2px;
+  color:var(--text2);padding:12px 8px 6px;
+}
+.cast-card{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 10px;border-radius:12px;cursor:pointer;
+  transition:all .15s;margin-bottom:2px;
+  border:1.5px solid transparent;
+}
+.cast-card:hover{background:var(--pink-bg);}
+.cast-card.active{background:var(--pink-soft);border-color:var(--pink-mid);}
+.cast-avatar{
+  width:38px;height:38px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;font-weight:900;color:#fff;
+}
+.cast-info{flex:1;min-width:0;}
+.cast-name{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cast-meta{font-size:11px;color:var(--text2);margin-top:1px;}
+.cast-status{
+  font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;flex-shrink:0;
+}
+.status-new{background:var(--yellow-soft);color:#9a7000;}
+.status-editing{background:#FFE0B2;color:#e65100;}
+.status-confirmed{background:var(--mint-soft);color:#1a6640;}
+.status-done{background:var(--mint-soft);color:#1a6640;}
+.status-draft{background:var(--lav-soft);color:#6030aa;}
+
+.add-cast-btn{
+  margin:8px;background:var(--white);
+  border:1.5px dashed var(--pink-mid);border-radius:12px;
+  padding:10px;font-size:13px;font-weight:700;color:var(--pink);
+  cursor:pointer;font-family:inherit;text-align:center;
+  transition:all .2s;
+}
+.add-cast-btn:hover{background:var(--pink-soft);}
+
+/* MAIN */
+.main{flex:1;overflow-y:auto;display:flex;flex-direction:column;}
+
+/* TOP BAR */
+.topbar{
+  height:var(--header-h);background:var(--white);
+  border-bottom:1.5px solid var(--border);
+  display:flex;align-items:center;padding:0 24px;gap:12px;
+  position:sticky;top:0;z-index:10;flex-shrink:0;
+}
+.topbar-name{font-size:18px;font-weight:900;flex:1;}
+.topbar-badge{
+  font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;
+}
+.tab-wrap{display:flex;gap:2px;background:var(--pink-bg);border-radius:12px;padding:3px;}
+.tab-btn{
+  padding:7px 16px;border-radius:9px;font-size:13px;font-weight:700;
+  border:none;cursor:pointer;font-family:inherit;color:var(--text2);
+  background:transparent;transition:all .2s;
+}
+.tab-btn.active{background:var(--white);color:var(--pink);box-shadow:0 1px 6px rgba(255,143,171,.2);}
+
+/* CONTENT AREA */
+.content{flex:1;padding:24px;}
+
+/* EMPTY STATE */
+.empty-state{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:60vh;text-align:center;
+}
+.empty-icon{font-size:56px;margin-bottom:16px;opacity:.5;}
+.empty-title{font-size:18px;font-weight:700;color:var(--text2);margin-bottom:6px;}
+.empty-sub{font-size:13px;color:var(--text2);}
+
+/* PANEL */
+.panel{background:var(--white);border:1.5px solid var(--border);border-radius:18px;margin-bottom:16px;overflow:hidden;}
+.panel-header{
+  padding:14px 18px;border-bottom:1.5px solid var(--border);
+  display:flex;align-items:center;gap:8px;
+}
+.panel-title{font-size:14px;font-weight:700;color:var(--text);flex:1;}
+.panel-badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;}
+.panel-body{padding:18px;}
+
+/* INFO GRID */
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.info-item{background:var(--pink-bg);border-radius:10px;padding:10px 12px;}
+.info-label{font-size:10px;font-weight:700;color:var(--text2);letter-spacing:1px;margin-bottom:4px;}
+.info-value{font-size:14px;font-weight:700;color:var(--text);}
+.info-item.full{grid-column:1/-1;}
+
+/* OPT TABLE */
+.opt-wrap{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.opt-row{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--pink-bg);border-radius:8px;padding:8px 12px;
+}
+.opt-name{font-size:12px;color:var(--text);}
+.opt-val{
+  font-size:13px;font-weight:900;width:24px;text-align:center;
+}
+.v-maru{color:var(--pink);}
+.v-maru2{color:#FF9EC5;}
+.v-sank{color:#c09000;}
+.v-batu{color:#bbb;}
+.opt-memo-txt{font-size:11px;color:var(--text2);margin-top:2px;grid-column:1/-1;}
+
+/* GENERATE AREA */
+.gen-box{
+  background:linear-gradient(135deg,#FFF5F8 0%,#F0EAFF 100%);
+  border:1.5px solid var(--pink-mid);border-radius:18px;
+  padding:20px;margin-bottom:16px;
+}
+.gen-title{font-size:15px;font-weight:700;margin-bottom:6px;}
+.gen-sub{font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:14px;}
+.gen-btn{
+  background:linear-gradient(135deg,var(--pink),#FF6B9D);
+  border:none;border-radius:12px;padding:13px 24px;
+  font-size:14px;font-weight:700;color:#fff;cursor:pointer;
+  font-family:inherit;box-shadow:0 4px 16px rgba(255,107,157,.28);
+  transition:all .25s;display:flex;align-items:center;gap:8px;
+}
+.gen-btn:hover{transform:translateY(-2px);box-shadow:0 7px 22px rgba(255,107,157,.35);}
+.gen-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+
+/* RESULT */
+.result-wrap{display:none;}
+.result-wrap.show{display:block;}
+.result-toolbar{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:10px;
+}
+.result-label{font-size:13px;font-weight:700;color:var(--text);}
+.copy-btn{
+  background:var(--mint-soft);border:1.5px solid var(--mint);
+  border-radius:10px;padding:7px 16px;font-size:13px;font-weight:700;
+  color:#1a6640;cursor:pointer;font-family:inherit;transition:all .2s;
+  display:flex;align-items:center;gap:6px;
+}
+.copy-btn:hover{background:var(--mint);color:#fff;}
+.copy-btn.copied{background:var(--mint);color:#fff;}
+
+/* プロフプレビュー */
+.prof-preview{
+  background:var(--white);border:1.5px solid var(--border);
+  border-radius:14px;padding:20px;
+}
+.prof-name-line{font-size:22px;font-weight:900;margin-bottom:4px;}
+.prof-spec{font-size:13px;color:var(--text2);line-height:1.8;margin-bottom:16px;}
+.prof-section{margin-bottom:16px;}
+.prof-section-title{
+  font-size:11px;font-weight:700;letter-spacing:2px;color:var(--pink);
+  margin-bottom:8px;padding-bottom:6px;border-bottom:1.5px solid var(--pink-soft);
+}
+.prof-text{font-size:14px;line-height:1.9;color:var(--text);}
+.prof-opts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.prof-opt-tag{
+  font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px;
+}
+.tag-maru{background:var(--pink-soft);color:var(--pink);}
+.tag-sankaku{background:var(--yellow-soft);color:#9a7000;}
+.tag-batu{background:#f5f5f5;color:#aaa;text-decoration:line-through;}
+
+/* LOADING */
+.loading-wrap{
+  display:none;flex-direction:column;align-items:center;
+  padding:40px;text-align:center;
+}
+.loading-wrap.show{display:flex;}
+.loading-dots{display:flex;gap:6px;margin-bottom:12px;}
+.loading-dots span{
+  width:10px;height:10px;border-radius:50%;background:var(--pink);
+  animation:dotbounce 1.2s infinite;
+}
+.loading-dots span:nth-child(2){animation-delay:.2s;}
+.loading-dots span:nth-child(3){animation-delay:.4s;}
+@keyframes dotbounce{0%,80%,100%{transform:scale(.7);opacity:.4;}40%{transform:scale(1);opacity:1;}}
+.loading-text{font-size:13px;color:var(--text2);}
+
+/* TOAST */
+.toast{
+  position:fixed;bottom:24px;right:24px;
+  background:var(--text);color:#fff;
+  padding:12px 20px;border-radius:12px;
+  font-size:13px;font-weight:700;
+  opacity:0;transform:translateY(10px);
+  transition:all .3s;pointer-events:none;z-index:999;
+}
+.toast.show{opacity:1;transform:translateY(0);}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-thumb{background:var(--pink-mid);border-radius:2px;}
+
+/* 手動入力モーダル */
+.modal-overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(46,31,40,.4);z-index:100;
+  align-items:center;justify-content:center;
+}
+.modal-overlay.show{display:flex;}
+.modal{
+  background:var(--white);border-radius:20px;
+  padding:28px;width:90%;max-width:500px;max-height:85vh;
+  overflow-y:auto;box-shadow:0 20px 60px rgba(46,31,40,.2);
+  animation:modalIn .3s ease;
+}
+@keyframes modalIn{from{opacity:0;transform:scale(.96);}to{opacity:1;transform:scale(1);}}
+.modal-title{font-size:18px;font-weight:900;margin-bottom:6px;}
+.modal-sub{font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.6;}
+.modal-field{margin-bottom:14px;}
+.modal-label{font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;display:block;}
+.modal-input{
+  width:100%;background:var(--pink-bg);border:1.5px solid var(--border);
+  border-radius:10px;padding:10px 14px;font-size:14px;color:var(--text);
+  font-family:inherit;outline:none;transition:border-color .2s;
+}
+.modal-input:focus{border-color:var(--pink);}
+.modal-btn-row{display:flex;gap:10px;margin-top:20px;}
+.modal-btn-ok{
+  flex:1;background:linear-gradient(135deg,var(--pink),#FF6B9D);
+  border:none;border-radius:12px;padding:13px;font-size:14px;font-weight:700;
+  color:#fff;cursor:pointer;font-family:inherit;
+}
+.modal-btn-cancel{
+  flex:1;background:transparent;border:1.5px solid var(--border);
+  border-radius:12px;padding:13px;font-size:14px;font-weight:700;
+  color:var(--text2);cursor:pointer;font-family:inherit;
+}
+
+/* responsive hint */
+@media(max-width:680px){
+  .sidebar{width:220px;}
+  .info-grid,.opt-wrap{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== パスワード認証画面 ===== -->
+<div id="auth-screen" style="
+  display:none;position:fixed;inset:0;z-index:9999;
+  background:linear-gradient(160deg,#FFF5F8 0%,#FFF8D6 45%,#F3EDFF 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:'Noto Sans JP',sans-serif;
+">
+  <div style="
+    background:#fff;border:1.5px solid #F0C8D5;border-radius:24px;
+    padding:40px 32px;width:90%;max-width:360px;text-align:center;
+    box-shadow:0 8px 32px rgba(255,143,171,.12);
+  ">
+    <div style="font-size:36px;margin-bottom:12px">🔐</div>
+    <div style="font-size:20px;font-weight:900;color:#3D2B35;margin-bottom:6px">内勤管理ページ</div>
+    <div style="font-size:13px;color:#9A7D87;margin-bottom:28px;line-height:1.6">
+      サクラムーンG スタッフ専用ページです。<br>パスワードを入力してください。
+    </div>
+    <input id="auth-input" type="password" placeholder="パスワード"
+      onkeydown="if(event.key==='Enter')checkAuth()"
+      style="
+        width:100%;background:#FFF5F8;border:1.5px solid #F0C8D5;
+        border-radius:12px;padding:13px 16px;font-size:16px;
+        color:#3D2B35;font-family:inherit;outline:none;
+        text-align:center;letter-spacing:3px;margin-bottom:10px;
+        transition:border-color .2s;
+      "
+      onfocus="this.style.borderColor='#FF8FAB'" onblur="this.style.borderColor='#F0C8D5'"
+    >
+    <div id="auth-error" style="
+      display:none;color:#FF5A7A;font-size:13px;font-weight:700;
+      margin-bottom:10px;
+    ">❌ パスワードが違います</div>
+    <button onclick="checkAuth()" style="
+      width:100%;background:linear-gradient(135deg,#FF8FAB,#FF6B9D);
+      border:none;border-radius:12px;padding:14px;
+      font-size:15px;font-weight:700;color:#fff;
+      cursor:pointer;font-family:inherit;
+      box-shadow:0 4px 16px rgba(255,107,157,.28);
+      transition:all .2s;
+    " onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='translateY(0)'">
+      ログイン
+    </button>
+  </div>
+</div>
+
+<div id="main-app" style="display:none;width:100%;height:100vh">
+<div class="layout">
+  <!-- ====== SIDEBAR ====== -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">✦ STAFF ONLY ✦</div>
+      <div class="sidebar-title">内勤管理ページ</div>
+      <div class="sidebar-sub">サクラムーンG</div>
+    </div>
+    <div class="sidebar-search">
+      <input class="search-input" type="text" placeholder="🔍 キャスト名で検索…" oninput="filterCasts(this.value)">
+    </div>
+    <div class="sidebar-list" id="sidebar-list">
+      <div class="sidebar-section">在籍キャスト</div>
+      <div id="cast-list-wrap"></div>
+    </div>
+    <button class="add-cast-btn" onclick="openModal()">＋ キャストを手動追加</button>
+  </aside>
+
+  <!-- ====== MAIN ====== -->
+  <main class="main">
+    <div class="topbar">
+      <div class="topbar-name" id="topbar-name">キャストを選択してください</div>
+      <div id="topbar-status"></div>
+      <div id="tab-wrap" style="display:none;align-items:center;gap:8px">
+        <span style="font-size:13px;font-weight:700;color:var(--pink)">📋 回答内容</span>
+      </div>
+    </div>
+
+    <div class="content" id="main-content">
+      <div class="empty-state">
+        <div class="empty-icon">👈</div>
+        <div class="empty-title">キャストを選んでください</div>
+        <div class="empty-sub">左のリストからキャストを選ぶと<br>回答内容とプロフ生成ができます</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- 手動追加モーダル -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-title">キャストを手動追加</div>
+    <div class="modal-sub">フォーム未提出のキャストを手動で追加できます。<br>最低限の情報だけでもOKです！</div>
+    <div class="modal-field">
+      <label class="modal-label">源氏名<span style="color:#FF5A7A;margin-left:4px">必須</span></label>
+      <input class="modal-input" id="m-name" type="text" placeholder="例：さくら">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">年齢</label>
+      <input class="modal-input" id="m-age" type="number" placeholder="例：22" style="max-width:120px">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">サイズ</label>
+      <input class="modal-input" id="m-size" type="text" placeholder="例：T158-B82(D)-W58-H85">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">Pサイズ</label>
+      <input class="modal-input" id="m-psize" type="text" placeholder="例：16cm">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">状態（竿/玉）</label>
+      <input class="modal-input" id="m-state" type="text" placeholder="例：あり/あり">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">髪の毛</label>
+      <input class="modal-input" id="m-hair" type="text" placeholder="例：地毛">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">性格</label>
+      <input class="modal-input" id="m-personality" type="text" placeholder="例：人見知りだけど話し出すと止まらない">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">趣味</label>
+      <input class="modal-input" id="m-hobby" type="text" placeholder="例：カフェ巡り、映画">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">チャームポイント</label>
+      <input class="modal-input" id="m-charm" type="text" placeholder="例：えくぼ、くびれ">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">タバコ</label>
+      <input class="modal-input" id="m-tabako" type="text" placeholder="例：非喫煙者">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">性感帯</label>
+      <input class="modal-input" id="m-erogenous" type="text" placeholder="例：耳、首筋">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">得意技</label>
+      <input class="modal-input" id="m-skill" type="text" placeholder="例：じらすのが得意">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">キャストから一言（素材）</label>
+      <input class="modal-input" id="m-comment" type="text" placeholder="キーワードや文章">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">内勤への連絡事項</label>
+      <input class="modal-input" id="m-internal" type="text" placeholder="例：150分以上のみ希望">
+    </div>
+    <div class="modal-btn-row">
+      <button class="modal-btn-cancel" onclick="closeModal()">キャンセル</button>
+      <button class="modal-btn-ok" onclick="addManualCast()">追加する</button>
+    </div>
+  </div>
+</div>
+
+<!-- GAS設定モーダル -->
+<div class="modal-overlay" id="gas-modal">
+  <div class="modal">
+    <div class="modal-title">⚙️ Google Sheets 連携設定</div>
+    <div class="modal-sub" style="line-height:1.8">
+      Google Apps Script（GAS）のデプロイURLを入力すると、<br>
+      フォーム提出データが自動でスプレッドシートに記録されます。<br><br>
+      <strong style="color:var(--text)">設定手順：</strong><br>
+      <span style="font-size:12px;color:var(--text2)">
+        ① Google スプレッドシートを新規作成<br>
+        ② 拡張機能 → Apps Script を開く<br>
+        ③ 下の「GASコードをコピー」ボタンのコードを貼り付け<br>
+        ④ デプロイ → 新しいデプロイ → ウェブアプリ<br>
+        　　実行者：自分、アクセス：全員 に設定<br>
+        ⑤ 発行されたURLをここに貼り付け
+      </span>
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">GAS デプロイURL</label>
+      <input class="modal-input" id="gas-url-input" type="text"
+        placeholder="https://script.google.com/macros/s/xxxxx/exec">
+    </div>
+    <div style="margin-bottom:14px">
+      <button onclick="copyGasCode()" style="
+        width:100%;background:var(--lav-soft);border:1.5px solid var(--lav);
+        border-radius:10px;padding:11px;font-size:13px;font-weight:700;
+        color:#6030aa;cursor:pointer;font-family:inherit;transition:all .2s;
+      ">📋 GASコードをコピー</button>
+    </div>
+    <div style="background:var(--mint-soft);border:1.5px solid var(--mint);border-radius:12px;padding:12px;font-size:12px;color:#1a6640;line-height:1.7;margin-bottom:16px" id="gas-status-msg">
+      <!-- 接続状態表示 -->
+    </div>
+    <div class="modal-btn-row">
+      <button class="modal-btn-cancel" onclick="closeGasModal()">キャンセル</button>
+      <button class="modal-btn-ok" onclick="saveGasUrl()">保存する</button>
+    </div>
+  </div>
+</div>
+
+<!-- ログアウトボタン（固定） -->
+<button onclick="logout()" style="
+  position:fixed;bottom:20px;left:16px;z-index:200;
+  background:rgba(255,255,255,.9);border:1.5px solid #F0C8D5;
+  border-radius:20px;padding:6px 14px;font-size:11px;font-weight:700;
+  color:#9A7D87;cursor:pointer;font-family:inherit;
+  box-shadow:0 2px 8px rgba(0,0,0,.08);transition:all .2s;
+" onmouseover="this.style.color='#FF5A7A';this.style.borderColor='#FF5A7A'" onmouseout="this.style.color='#9A7D87';this.style.borderColor='#F0C8D5'">
+  🔒 ログアウト
+</button>
+
+</div><!-- /main-app -->
+
+<script>
+// =========================================================
+//  パスワード認証
+//  ★ パスワードを変更する場合はここを書き換えてください ★
+// =========================================================
+const STAFF_PASSWORD = 'sakura2024'; // ← ここを変更
+const SESSION_HOURS  = 24;            // セッション有効時間（時間）
+
+// パスワードの簡易ハッシュ（PW変更時にセッションを自動無効化するため）
+function simpleHash(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return String(hash);
+}
+
+function checkAuth() {
+  const input = document.getElementById('auth-input').value;
+  if (input === STAFF_PASSWORD) {
+    const expiry = Date.now() + SESSION_HOURS * 60 * 60 * 1000;
+    localStorage.setItem('sakuraMoon_authExpiry', expiry);
+    localStorage.setItem('sakuraMoon_authHash', simpleHash(STAFF_PASSWORD));
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('main-app').style.display    = 'flex';
+    init();
+  } else {
+    const errEl = document.getElementById('auth-error');
+    errEl.style.display = 'block';
+    const inp = document.getElementById('auth-input');
+    inp.value = '';
+    inp.style.borderColor = '#FF5A7A';
+    setTimeout(() => { inp.style.borderColor = '#F0C8D5'; }, 1500);
+  }
+}
+
+function logout() {
+  localStorage.removeItem('sakuraMoon_authExpiry');
+  localStorage.removeItem('sakuraMoon_authHash');
+  location.reload();
+}
+
+// 起動時に認証チェック
+(function() {
+  const expiry      = parseInt(localStorage.getItem('sakuraMoon_authExpiry') || '0');
+  const savedHash   = localStorage.getItem('sakuraMoon_authHash') || '';
+  const currentHash = simpleHash(STAFF_PASSWORD);
+  const sessionValid = Date.now() < expiry && savedHash === currentHash;
+
+  if (sessionValid) {
+    // セッション有効 かつ PW変更なし → そのまま表示
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('main-app').style.display    = 'flex';
+    document.addEventListener('DOMContentLoaded', () => init());
+  } else {
+    // セッション切れ or PW変更済み → 強制ログアウト・認証画面へ
+    localStorage.removeItem('sakuraMoon_authExpiry');
+    localStorage.removeItem('sakuraMoon_authHash');
+    document.getElementById('auth-screen').style.display = 'flex';
+    document.getElementById('main-app').style.display    = 'none';
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('auth-input')?.focus();
+    });
+  }
+})();
+
+// =========================================================
+//  オプション定義
+// =========================================================
+const OPT_ALL = [
+  'AF','逆AF','前立腺マッサージ','兜合わせ','玉舐め','キス','全身リップ',
+  '乳首責め','生フェラ','69','Sプレイ','Mプレイ','お泊りコース','デートコース',
+  '女装されているお客様','外国人のお客様',
+  'キャスト射精（有料）','コース内キャスト2回以上射精（有料）',
+  '3P／お客様2名（有料）','3P／キャスト2名（有料）',
+  'コスプレ（有料）','ごっくん（有料）','聖水（有料）'
+];
+
+// アバターカラー
+const AVATAR_COLORS = [
+  '#FF8FAB','#FFB347','#84C8A4','#C4AAEE','#FF9EC5','#7EC8E3','#F4B8D1','#A8D8A8'
+];
+
+// =========================================================
+//  デモデータ
+// =========================================================
+// LocalStorageからキャッシュを復元
+let casts = [];
+try {
+  const cached = localStorage.getItem('sakuraMoon_castsCache');
+  if (cached) casts = JSON.parse(cached);
+} catch(e) {}
+
+// キャスト一覧をLocalStorageに保存するヘルパー
+function saveCastsCache() {
+  try { localStorage.setItem('sakuraMoon_castsCache', JSON.stringify(casts)); } catch(e) {}
+}
+
+let currentCastId = null;
+let currentTab = 'answer';
+let generatedText = '';
+
+// =========================================================
+//  サイドバー
+// =========================================================
+function renderSidebar(filter) {
+  const wrap = document.getElementById('cast-list-wrap');
+  wrap.innerHTML = '';
+  let list = filter ? casts.filter(c => c.name.includes(filter)) : [...casts];
+  // 名前のあいうえお順（名字・名前を分けずに名前全体で比較）
+  list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ja'));
+  list.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'cast-card' + (c.id === currentCastId ? ' active' : '');
+    div.onclick = () => selectCast(c.id);
+    const statusLabel = {new:'新着',editing:'編集中',confirmed:'確定',done:'確定',draft:'手動'}[c.status] || '新着';
+    const statusClass = {new:'status-new',editing:'status-editing',confirmed:'status-confirmed',done:'status-confirmed',draft:'status-draft'}[c.status] || 'status-new';
+    div.innerHTML = `
+      <div class="cast-avatar" style="background:${AVATAR_COLORS[c.colorIdx % AVATAR_COLORS.length]}">${c.name[0]}</div>
+      <div class="cast-info">
+        <div class="cast-name">${c.name}</div>
+        <div class="cast-meta">${c.age}歳 / ${c.size ? c.size.split('-')[0] : '—'}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+        <div class="cast-status ${statusClass}">${statusLabel}</div>
+        <button onclick="event.stopPropagation();deleteCast('${c.id}')" style="background:transparent;border:none;cursor:pointer;font-size:14px;color:#ccc;padding:0;line-height:1;transition:color .15s" onmouseover="this.style.color='#FF5A7A'" onmouseout="this.style.color='#ccc'" title="削除">✕</button>
+      </div>
+    `;
+    wrap.appendChild(div);
+  });
+}
+
+function filterCasts(val) { renderSidebar(val); }
+
+// =========================================================
+//  キャスト選択
+// =========================================================
+function selectCast(id) {
+  currentCastId = id;
+  currentTab = 'answer';
+  generatedText = '';
+  renderSidebar();
+  const cast = casts.find(c => c.id === id);
+  if (!cast) return;
+  document.getElementById('topbar-name').textContent = cast.name;
+  const statusLabel = {new:'新着',editing:'編集中',confirmed:'確定',done:'確定',draft:'手動'}[cast.status] || '新着';
+  const statusClass = {new:'status-new',editing:'status-editing',confirmed:'status-confirmed',done:'status-confirmed',draft:'status-draft'}[cast.status] || 'status-new';
+  document.getElementById('topbar-status').innerHTML = `<div class="cast-status ${statusClass}" style="font-size:12px;padding:4px 12px">${statusLabel}</div>`;
+  document.getElementById('tab-wrap').style.display = 'flex';
+  renderAnswerTab(cast);
+}
+
+// =========================================================
+//  回答内容タブ
+// =========================================================
+function renderAnswerTab(cast) {
+  const el = document.getElementById('main-content');
+  const OPT_LEFT = [
+    ['AF',                                  'AF'],
+    ['逆AF',                                '逆ＡＦ'],
+    ['前立腺マッサージ',                    '前立腺マッサージ'],
+    ['兜合わせ',                            '兜合わせ'],
+    ['玉舐め',                              '玉舐め'],
+    ['キス',                                'キス'],
+    ['全身リップ',                          '全身リップ'],
+    ['乳首責め',                            '乳首責め'],
+    ['生フェラ',                            '生フェラ'],
+    ['69',                                  '69'],
+    ['Sプレイ',                             'Sプレイ'],
+    ['Mプレイ',                             'Mプレイ'],
+    ['お泊りコース',                        'お泊りコース'],
+    ['デートコース',                        'デートコース'],
+    ['キャスト射精（有料）',                '射精（有料）'],
+  ];
+  const OPT_RIGHT = [
+    ['コース内キャスト2回以上射精（有料）', 'キャスト無限射精（有料）'],
+    ['3P／お客様2名（有料）',               '3P／お客様2名（有料）'],
+    ['3P／キャスト2名（有料）',             '3P／キャスト2名（有料）'],
+    ['コスプレ（有料）',                    'コスプレ（有料）'],
+    ['ごっくん（有料）',                    'ごっくん（有料）'],
+    ['聖水（有料）',                        '聖水（有料）'],
+    ['女装されているお客様',               '女装されているお客様（必ず事前にご申告ください）'],
+    ['外国人のお客様',                      '外国人のお客様（必ず事前にご申告ください）'],
+  ];
+
+  function renderOptCol(list) {
+    return list.map(([key, label]) => {
+      const v    = cast.options?.[key] || '—';
+      const cls  = v==='◎'?'v-maru':v==='○'?'v-maru2':v==='△'?'v-sank':'v-batu';
+      const memo = cast.optMemo?.[key]
+        ? `<span style="font-size:11px;color:var(--text2);font-weight:400;margin-left:auto;padding-left:8px;white-space:nowrap">（${cast.optMemo[key]}）</span>`
+        : '';
+      return `<div style="background:var(--pink-bg);border-radius:10px;padding:10px 12px;display:flex;align-items:center;margin-bottom:6px">
+        <div style="font-size:14px;font-weight:700;color:var(--text)">${label}</div>
+        <div class="opt-val ${cls}" style="font-size:14px;font-weight:700;margin-left:6px;flex-shrink:0">${v}</div>
+        ${memo}
+      </div>`;
+    }).join('');
+  }
+
+  const optRows = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px;align-items:start">
+      <div>${renderOptCol(OPT_LEFT)}</div>
+      <div>${renderOptCol(OPT_RIGHT)}</div>
+    </div>
+  `;
+
+  el.innerHTML = `
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">📋 基本情報</div>
+        <button onclick="toggleEdit()" id="edit-btn" style="
+          background:var(--pink-soft);border:1.5px solid var(--pink-mid);
+          border-radius:10px;padding:6px 14px;font-size:12px;font-weight:700;
+          color:var(--pink);cursor:pointer;font-family:inherit;transition:all .2s;
+        ">✏️ 編集する</button>
+      </div>
+      <div class="panel-body" id="info-view-mode">
+        <div class="info-grid">
+          <div class="info-item"><div class="info-label">① 源氏名</div><div class="info-value">${cast.name}</div></div>
+          <div class="info-item"><div class="info-label">② 年齢</div><div class="info-value">${cast.age}歳</div></div>
+          <div class="info-item"><div class="info-label">③ ３サイズ</div><div class="info-value">${cast.size}</div></div>
+          <div class="info-item"><div class="info-label">④ Pサイズ</div><div class="info-value">${cast.psize || '—'}</div></div>
+          <div class="info-item"><div class="info-label">⑤ 性格</div><div class="info-value">${cast.personality || '—'}</div></div>
+          <div class="info-item"><div class="info-label">⑥ 趣味</div><div class="info-value">${cast.hobby || '—'}</div></div>
+          <div class="info-item"><div class="info-label">⑦ 性感帯</div><div class="info-value">${cast.erogenous || '—'}</div></div>
+          <div class="info-item"><div class="info-label">⑧ チャームポイント</div><div class="info-value">${cast.charm || '—'}</div></div>
+          <div class="info-item"><div class="info-label">⑨ 状態（竿/玉）</div><div class="info-value">${cast.state || '—'}</div></div>
+          <div class="info-item"><div class="info-label">⑩ 髪の毛</div><div class="info-value">${cast.hair || '—'}</div></div>
+          <div class="info-item"><div class="info-label">得意技</div><div class="info-value">${cast.skill || '—'}</div></div>
+          <div class="info-item"><div class="info-label">タバコ</div><div class="info-value">${cast.tabako || '—'}</div></div>
+          <div class="info-item full"><div class="info-label">雰囲気</div><div class="info-value">${(cast.vibes||[]).join('・') || '—'}</div></div>
+        </div>
+      </div>
+      <div class="panel-body" id="info-edit-mode" style="display:none">
+        <div class="info-grid">
+          ${[
+            ['name','① 源氏名',cast.name],
+            ['age','② 年齢',cast.age],
+            ['size','③ ３サイズ',cast.size],
+            ['psize','④ Pサイズ',cast.psize],
+            ['personality','⑤ 性格',cast.personality],
+            ['hobby','⑥ 趣味',cast.hobby],
+            ['erogenous','⑦ 性感帯',cast.erogenous],
+            ['charm','⑧ チャームポイント',cast.charm],
+            ['state','⑨ 状態（竿/玉）',cast.state],
+            ['hair','⑩ 髪の毛',cast.hair],
+            ['skill','得意技',cast.skill],
+            ['tabako','タバコ',cast.tabako],
+          ].map(([id,label,val]) => `
+            <div class="info-item">
+              <div class="info-label">${label}</div>
+              <input id="edit-${id}" type="text" value="${val||''}" style="
+                width:100%;background:var(--pink-bg);border:1.5px solid var(--border);
+                border-radius:8px;padding:7px 10px;font-size:13px;color:var(--text);
+                font-family:inherit;outline:none;
+              ">
+            </div>`).join('')}
+          <div class="info-item full">
+            <div class="info-label">雰囲気</div>
+            <input id="edit-vibes" type="text" value="${(cast.vibes||[]).join('・')}" style="
+              width:100%;background:var(--pink-bg);border:1.5px solid var(--border);
+              border-radius:8px;padding:7px 10px;font-size:13px;color:var(--text);
+              font-family:inherit;outline:none;
+            ">
+          </div>
+        </div>
+        <button onclick="saveEdit()" style="
+          margin-top:14px;width:100%;
+          background:linear-gradient(135deg,var(--pink),#FF6B9D);
+          border:none;border-radius:12px;padding:13px;
+          font-size:14px;font-weight:700;color:#fff;
+          cursor:pointer;font-family:inherit;
+        ">💾 保存する</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">✅ オプション可否</div>
+        <button onclick="toggleOptEdit()" id="opt-edit-btn" style="
+          background:var(--pink-soft);border:1.5px solid var(--pink-mid);
+          border-radius:10px;padding:6px 14px;font-size:12px;font-weight:700;
+          color:var(--pink);cursor:pointer;font-family:inherit;transition:all .2s;
+        ">✏️ 編集する</button>
+      </div>
+      <div class="panel-body">
+        <div id="opt-view-mode" style="display:block">
+          <div class="opt-wrap" style="display:block">${optRows}</div>
+        </div>
+        <div id="opt-edit-mode" style="display:none">
+          ${(() => {
+            const allOpts = [...OPT_LEFT, ...OPT_RIGHT];
+            return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+              ${allOpts.map(([key, label]) => {
+                const cur = cast.options?.[key] || '';
+                return `<div style="background:var(--pink-bg);border-radius:10px;padding:8px 10px">
+                  <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px">${label}</div>
+                  <div style="display:flex;gap:4px">
+                    ${['◎','○','△','×'].map(v => `
+                      <label style="flex:1;text-align:center">
+                        <input type="radio" name="opt-edit-${key}" value="${v}" ${cur===v?'checked':''} onchange="updateOptVal('${key}',this.value)" style="display:none">
+                        <span style="display:block;border-radius:6px;padding:5px 2px;font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);transition:all .15s;${cur===v?getBtnStyle(v):'color:var(--text2)'}">${v}</span>
+                      </label>`).join('')}
+                  </div>
+                  <input type="text" placeholder="備考" value="${cast.optMemo?.[key]||''}" onchange="updateOptMemo('${key}',this.value)" style="
+                    width:100%;margin-top:6px;background:#fff;border:1px solid var(--border);
+                    border-radius:6px;padding:4px 8px;font-size:11px;color:var(--text);
+                    font-family:inherit;outline:none;
+                  ">
+                </div>`;
+              }).join('')}
+            </div>`;
+          })()}
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-comment">
+      <div class="panel-header">
+        <div class="panel-title">💬 キャストからひとこと（素材）</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span id="badge-comment" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:var(--yellow-soft);color:#9a7000">${cast.comment ? '確定' : '新着'}</span>
+          <button id="editbtn-comment" onclick="toggleFieldEdit('comment')" style="background:var(--pink-soft);border:1.5px solid var(--pink-mid);border-radius:10px;padding:5px 12px;font-size:12px;font-weight:700;color:var(--pink);cursor:pointer;font-family:inherit;transition:all .2s">✏️ 編集する</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="view-comment" style="background:var(--pink-bg);border-radius:10px;padding:12px 14px;font-size:14px;line-height:1.8;color:var(--text);white-space:pre-wrap;min-height:50px">${cast.comment || '<span style="color:var(--text2)">未入力</span>'}</div>
+        <textarea id="edit-comment" style="display:none;width:100%;background:var(--pink-bg);border:1.5px solid var(--pink);border-radius:10px;padding:12px 14px;font-size:14px;color:var(--text);font-family:inherit;outline:none;resize:none;min-height:90px;line-height:1.8">${cast.comment || ''}</textarea>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-manager">
+      <div class="panel-header">
+        <div class="panel-title">✍️ 店長から一言</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span id="badge-manager" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:var(--yellow-soft);color:#9a7000">${cast.generatedManagerComment ? '確定' : '新着'}</span>
+          <button id="editbtn-manager" onclick="toggleFieldEdit('manager')" style="background:var(--pink-soft);border:1.5px solid var(--pink-mid);border-radius:10px;padding:5px 12px;font-size:12px;font-weight:700;color:var(--pink);cursor:pointer;font-family:inherit;transition:all .2s">✏️ 編集する</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="view-manager" style="background:var(--pink-bg);border-radius:10px;padding:12px 14px;font-size:14px;line-height:1.8;color:var(--text);white-space:pre-wrap;min-height:50px">${cast.generatedManagerComment || '<span style="color:var(--text2)">未入力</span>'}</div>
+        <textarea id="edit-manager" style="display:none;width:100%;background:var(--pink-bg);border:1.5px solid var(--pink);border-radius:10px;padding:12px 14px;font-size:14px;color:var(--text);font-family:inherit;outline:none;resize:none;min-height:130px;line-height:1.8" placeholder="店長から一言を入力してください">${cast.generatedManagerComment || ''}</textarea>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-internal">
+      <div class="panel-header">
+        <div class="panel-title">🔒 内勤への連絡事項</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="panel-badge" style="background:var(--lav-soft);color:#6030aa">内勤のみ</div>
+          <span id="badge-internal" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:var(--yellow-soft);color:#9a7000">${cast.internal ? '確定' : '新着'}</span>
+          <button id="editbtn-internal" onclick="toggleFieldEdit('internal')" style="background:var(--pink-soft);border:1.5px solid var(--pink-mid);border-radius:10px;padding:5px 12px;font-size:12px;font-weight:700;color:var(--pink);cursor:pointer;font-family:inherit;transition:all .2s">✏️ 編集する</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="view-internal" style="background:var(--lav-soft);border-radius:10px;padding:12px 14px;font-size:14px;line-height:1.8;color:var(--text);white-space:pre-wrap;min-height:50px">${cast.internal || '<span style="color:var(--text2)">未入力</span>'}</div>
+        <textarea id="edit-internal" style="display:none;width:100%;background:var(--lav-soft);border:1.5px solid var(--lavender);border-radius:10px;padding:12px 14px;font-size:14px;color:var(--text);font-family:inherit;outline:none;resize:none;min-height:80px;line-height:1.8">${cast.internal || ''}</textarea>
+      </div>
+    </div>
+
+    ${cast.generatedCastComment ? `
+    <div class="panel" style="border-color:var(--mint);background:var(--mint-soft)">
+      <div class="panel-header" style="border-color:var(--mint)">
+        <div class="panel-title" style="color:#1a6640">✅ 完成プロフ</div>
+        <div class="panel-badge" style="background:#d0f5e8;color:#1a6640">反映済み</div>
+      </div>
+      <div class="panel-body">
+        <div style="margin-bottom:14px">
+          <div style="font-size:11px;font-weight:700;letter-spacing:2px;color:#2a8a60;margin-bottom:8px">本人から一言</div>
+          <div style="background:#fff;border:1.5px solid var(--mint);border-radius:10px;padding:14px;font-size:14px;line-height:1.9;color:var(--text)">${cast.generatedCastComment.replace(/\n/g,'<br>')}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:2px;color:#2a8a60;margin-bottom:8px">店長から一言</div>
+          <div style="background:#fff;border:1.5px solid var(--mint);border-radius:10px;padding:14px;font-size:14px;line-height:1.9;color:var(--text)">${(cast.generatedManagerComment||'').replace(/\n/g,'<br>')}</div>
+        </div>
+        <button onclick="copyCompleted()" style="
+          margin-top:14px;width:100%;
+          background:linear-gradient(135deg,#7DD8B0,#4CC494);
+          border:none;border-radius:12px;padding:13px;
+          font-size:14px;font-weight:700;color:#1a6640;
+          cursor:pointer;font-family:inherit;transition:all .2s;
+        ">📋 完成プロフ全文をコピー</button>
+      </div>
+    </div>
+    ` : ''}
+
+    <div style="position:sticky;bottom:16px;padding:0 0 8px">
+      <button onclick="saveAllEdits()" style="
+        width:100%;background:linear-gradient(135deg,#7DD8B0,#4CC494);
+        border:none;border-radius:14px;padding:15px;
+        font-size:15px;font-weight:700;color:#1a6640;
+        cursor:pointer;font-family:inherit;letter-spacing:.5px;
+        box-shadow:0 4px 18px rgba(110,212,168,.3);transition:all .25s;
+      " onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+        💾 すべての変更を保存する
+      </button>
+    </div>
+  `;
+
+  window._editMode = false;
+  window._optEditMode = false;
+}
+
+function toggleEdit() {
+  window._editMode = !window._editMode;
+  document.getElementById('info-view-mode').style.display = window._editMode ? 'none' : 'block';
+  document.getElementById('info-edit-mode').style.display = window._editMode ? 'block' : 'none';
+  document.getElementById('edit-btn').textContent = window._editMode ? '👁 表示に戻す' : '✏️ 編集する';
+}
+
+function saveEdit() {
+  const cast = casts.find(c => c.id === currentCastId);
+  if (!cast) return;
+  ['name','age','size','psize','personality','hobby','erogenous','charm','state','hair','skill','tabako'].forEach(f => {
+    const el = document.getElementById('edit-' + f);
+    if (el) cast[f] = el.value;
+  });
+  const vibesEl = document.getElementById('edit-vibes');
+  if (vibesEl) cast.vibes = vibesEl.value.split('・').filter(Boolean);
+  saveCastsCache();
+  toggleEdit();
+  showToast('✅ 基本情報を保存しました');
+}
+
+function getBtnStyle(v) {
+  const styles = {
+    '◎': 'background:var(--pink);color:#fff;border-color:var(--pink)',
+    '○': 'background:#FF9EC5;color:#fff;border-color:#FF9EC5',
+    '△': 'background:var(--yellow);color:var(--text);border-color:var(--yellow)',
+    '×': 'background:#bbb;color:#fff;border-color:#bbb',
+  };
+  return styles[v] || '';
+}
+
+function toggleOptEdit() {
+  window._optEditMode = !window._optEditMode;
+  document.getElementById('opt-view-mode').style.display = window._optEditMode ? 'none' : 'block';
+  document.getElementById('opt-edit-mode').style.display = window._optEditMode ? 'block' : 'none';
+  document.getElementById('opt-edit-btn').textContent = window._optEditMode ? '👁 表示に戻す' : '✏️ 編集する';
+  // ラジオボタンの選択済みスタイルを適用
+  if (window._optEditMode) {
+    setTimeout(() => {
+      document.querySelectorAll('#opt-edit-mode input[type=radio]:checked').forEach(r => {
+        const span = r.nextElementSibling;
+        if (span) span.style.cssText += ';' + getBtnStyle(r.value);
+      });
+      document.querySelectorAll('#opt-edit-mode input[type=radio]').forEach(r => {
+        r.addEventListener('change', function() {
+          const name = this.name;
+          document.querySelectorAll(`input[name="${name}"]`).forEach(x => {
+            if (x.nextElementSibling) x.nextElementSibling.style.cssText =
+              'display:block;border-radius:6px;padding:5px 2px;font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);transition:all .15s;color:var(--text2)';
+          });
+          if (this.nextElementSibling) this.nextElementSibling.style.cssText +=
+            ';' + getBtnStyle(this.value);
+        });
+      });
+    }, 50);
+  }
+}
+
+function updateOptVal(key, val) {
+  const cast = casts.find(c => c.id === currentCastId);
+  if (!cast) return;
+  if (!cast.options) cast.options = {};
+  cast.options[key] = val;
+}
+
+function updateOptMemo(key, val) {
+  const cast = casts.find(c => c.id === currentCastId);
+  if (!cast) return;
+  if (!cast.optMemo) cast.optMemo = {};
+  cast.optMemo[key] = val;
+}
+
+// 編集中フィールドを追跡
+window._editingFields = new Set();
+
+function toggleFieldEdit(field) {
+  const viewEl   = document.getElementById('view-' + field);
+  const editEl   = document.getElementById('edit-' + field);
+  const badgeEl  = document.getElementById('badge-' + field);
+  const btnEl    = document.getElementById('editbtn-' + field);
+  if (!viewEl || !editEl) return;
+
+  const isEditing = window._editingFields.has(field);
+  const cast = casts.find(c => c.id === currentCastId);
+
+  if (isEditing) {
+    // 編集→表示に戻す（保存はしない）
+    window._editingFields.delete(field);
+    viewEl.style.display  = 'block';
+    editEl.style.display  = 'none';
+    btnEl.textContent     = '✏️ 編集する';
+    btnEl.style.background = 'var(--pink-soft)';
+    btnEl.style.color      = 'var(--pink)';
+    const val = field === 'comment' ? cast?.comment
+              : field === 'manager' ? cast?.generatedManagerComment
+              : cast?.internal;
+    setBadge(field, val ? 'confirmed' : 'new');
+  } else {
+    // 表示→編集モードへ
+    window._editingFields.add(field);
+    viewEl.style.display  = 'none';
+    editEl.style.display  = 'block';
+    editEl.focus();
+    btnEl.textContent     = '👁 表示に戻す';
+    btnEl.style.background = 'var(--yellow-soft)';
+    btnEl.style.color      = '#9a7000';
+    setBadge(field, 'editing');
+  }
+
+  // キャスト全体のステータスを更新
+  updateCastStatus(cast);
+}
+
+function setBadge(field, state) {
+  const el = document.getElementById('badge-' + field);
+  if (!el) return;
+  const styles = {
+    new:       { bg: 'var(--yellow-soft)', color: '#9a7000', text: '新着' },
+    editing:   { bg: '#FFE0B2',            color: '#e65100', text: '編集中' },
+    confirmed: { bg: 'var(--mint-soft)',   color: '#1a6640', text: '確定'  },
+  };
+  const s = styles[state] || styles.new;
+  el.style.background = s.bg;
+  el.style.color      = s.color;
+  el.textContent      = s.text;
+}
+
+// キャスト全体のステータスを3つの確定状態から計算
+function updateCastStatus(cast) {
+  if (!cast) return;
+  if (window._editingFields && window._editingFields.size > 0) {
+    cast.status = 'editing';
+  } else {
+    const allConfirmed = cast.comment && cast.generatedManagerComment && cast.internal;
+    cast.status = allConfirmed ? 'confirmed' : 'new';
+  }
+  // 右上のステータスバッジも即時更新
+  const statusLabel = {new:'新着',editing:'編集中',confirmed:'確定',done:'確定',draft:'手動'}[cast.status] || '新着';
+  const statusClass = {new:'status-new',editing:'status-editing',confirmed:'status-confirmed',done:'status-confirmed',draft:'status-draft'}[cast.status] || 'status-new';
+  const el = document.getElementById('topbar-status');
+  if (el) el.innerHTML = `<div class="cast-status ${statusClass}" style="font-size:12px;padding:4px 12px">${statusLabel}</div>`;
+  saveCastsCache();
+  renderSidebar();
+}
+
+function saveAllEdits() {
+  const cast = casts.find(c => c.id === currentCastId);
+  if (!cast) return;
+
+  // 基本情報
+  if (window._editMode) saveEdit();
+
+  // オプション
+  if (window._optEditMode) {
+    document.querySelectorAll('#opt-edit-mode input[type=radio]:checked').forEach(r => {
+      const key = r.name.replace('opt-edit-', '');
+      if (!cast.options) cast.options = {};
+      cast.options[key] = r.value;
+    });
+  }
+
+  // 3つのテキストフィールドを全て確定に
+  ['comment', 'manager', 'internal'].forEach(field => {
+    const editEl = document.getElementById('edit-' + field);
+    const viewEl = document.getElementById('view-' + field);
+    const btnEl  = document.getElementById('editbtn-' + field);
+    if (!editEl) return;
+
+    const val = editEl.value;
+    if (field === 'comment')  cast.comment                 = val;
+    if (field === 'manager')  cast.generatedManagerComment = val;
+    if (field === 'internal') cast.internal                = val;
+
+    // 表示モードに戻す
+    viewEl.innerHTML      = val || '<span style="color:var(--text2)">未入力</span>';
+    viewEl.style.display  = 'block';
+    editEl.style.display  = 'none';
+    if (btnEl) { btnEl.textContent = '✏️ 編集する'; btnEl.style.background = 'var(--pink-soft)'; btnEl.style.color = 'var(--pink)'; }
+    window._editingFields.delete(field);
+    setBadge(field, val ? 'confirmed' : 'new');
+  });
+
+  // キャスト全体ステータスを確定に
+  const allConfirmed = cast.comment && cast.generatedManagerComment && cast.internal;
+  cast.status = allConfirmed ? 'confirmed' : 'new';
+  const statusLabel = {new:'新着',confirmed:'確定'}[cast.status];
+  const statusClass = {new:'status-new',confirmed:'status-confirmed'}[cast.status];
+  const topEl = document.getElementById('topbar-status');
+  if (topEl) topEl.innerHTML = `<div class="cast-status ${statusClass}" style="font-size:12px;padding:4px 12px">${statusLabel}</div>`;
+
+  saveCastsCache();
+  renderSidebar();
+  showToast('💾 すべての変更を保存しました！');
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  const cast = casts.find(c => c.id === currentCastId);
+  renderAnswerTab(cast);
+}
+
+// =========================================================
+//  店長から一言 AI生成
+// =========================================================
+async function generateManagerComment() {
+  const cast = casts.find(c => c.id === currentCastId);
+  if (!cast) return;
+  const loading = document.getElementById('gen-loading');
+  if (loading) loading.style.display = 'flex';
+
+  const okOpts   = OPT_ALL.filter(o => ['◎','○'].includes(cast.options?.[o]));
+  const sankOpts = OPT_ALL.filter(o => cast.options?.[o] === '△');
+  const ngOpts   = OPT_ALL.filter(o => cast.options?.[o] === '×');
+
+  const prompt = `あなたはニューハーフ風俗店「サクラムーンG」の店長です。
+以下のキャスト情報をもとに「店長から一言」を書いてください。
+
+名前：${cast.name}　年齢：${cast.age}歳　サイズ：${cast.size}
+Pサイズ：${cast.psize}　状態（竿/玉）：${cast.state}　髪の毛：${cast.hair}
+性格：${cast.personality}　趣味：${cast.hobby}
+チャームポイント：${cast.charm}　性感帯：${cast.erogenous}　得意技：${cast.skill}
+雰囲気：${(cast.vibes||[]).join('、')}
+OK(◎○)：${okOpts.join('、')}
+条件付(△)：${sankOpts.join('、')}
+NG(×)：${ngOpts.join('、')}
+
+【条件】
+・300字以上400字以内で書く
+・第三者目線でこのキャストの魅力・プレイの特徴・体の特徴・おすすめポイントを具体的に
+・お客様が会いたくなるような文章
+・絵文字を適度に使う
+・文章のみで返答（JSON不要）`;
+
+  try {
+    const res  = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    const text = data.content?.[0]?.text || '';
+    const el = document.getElementById('edit-manager');
+    if (el) el.value = text;
+    cast.generatedManagerComment = text;
+    saveCastsCache();
+  } catch(e) {}
+  if (loading) loading.style.display = 'none';
+}
+
+// =========================================================
+//  本人から一言 AI生成 → 完成プロフ
+// =========================================================
+async function generateCastComment() {
+  const cast = casts.find(c => c.id === currentCastId);
+  if (!cast) return;
+  showToast('🪄 本人から一言を生成中...');
+
+  const commentEl = document.getElementById('edit-comment');
+  const rawComment = commentEl ? commentEl.value : (cast.comment || '');
+
+  const prompt = `以下のキャストの本人コメント素材をもとに、100〜130字で仕上げてください。
+文章の内容・言い回しはできるだけそのまま使い、絵文字を可愛く自然に加えるだけでOKです。
+文章のみで返答してください。
+
+素材：${rawComment}`;
+
+  try {
+    const res  = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 400,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    const castComment = data.content?.[0]?.text || rawComment;
+
+    cast.generatedCastComment    = castComment;
+    cast.generatedManagerComment = cast.generatedManagerComment ||
+      (document.getElementById('edit-manager')?.value || '');
+    cast.status = 'done';
+    saveCastsCache();
+    renderSidebar();
+    renderAnswerTab(cast);
+    showToast('✅ 完成プロフを作成しました！');
+  } catch(e) {
+    showToast('⚠️ 生成に失敗しました');
+  }
+}
+
+// =========================================================
+//  AI生成（旧generateProf・applyToAnswer互換）
+// =========================================================
+async function generateProf() {
+  const cast = casts.find(c => c.id === currentCastId);
+  document.getElementById('gen-btn').disabled = true;
+  document.getElementById('loading').classList.add('show');
+  document.getElementById('result-wrap').classList.remove('show');
+
+  const okOpts = OPT_ALL.filter(o => ['◎','○'].includes(cast.options?.[o]));
+  const sankOpts = OPT_ALL.filter(o => cast.options?.[o] === '△');
+  const ngOpts = OPT_ALL.filter(o => cast.options?.[o] === '×');
+
+  const prompt = `あなたはニューハーフ風俗店「サクラムーンG」のプロフライターです。
+以下のキャスト情報から、HPに掲載するプロフィールを作成してください。
+
+【キャスト情報】
+名前：${cast.name}
+年齢：${cast.age}歳
+サイズ：${cast.size}
+Pサイズ：${cast.psize}
+状態（竿/玉）：${cast.state}
+髪の毛：${cast.hair}
+性格：${cast.personality}
+趣味：${cast.hobby}
+チャームポイント：${cast.charm}
+タバコ：${cast.tabako}
+性感帯：${cast.erogenous}
+得意技：${cast.skill}
+雰囲気：${(cast.vibes||[]).join('、')}
+本人コメント素材：${cast.comment}
+
+【オプション】
+OK(◎○)：${okOpts.join('、')}
+条件付(△)：${sankOpts.join('、')}
+NG(×)：${ngOpts.join('、')}
+
+以下のJSON形式のみで回答してください（マークダウン不要、余分なテキスト不要）：
+{
+  "castComment": "本人から一言（100〜130字厳守。キャストの本人コメント素材の文章をそのまま使い、絵文字を可愛く自然に加えて仕上げること。文章の内容・言い回しは変えない。文字数を素材より大幅に増やさない）",
+  "managerComment": "店長から一言（300字以上400字以内厳守。プロフ全体（サイズ・性格・得意技・オプション・雰囲気など）を総合的に見て、お客様がこのキャストに会いたくなるような第三者目線の推し文句を書く。特徴的な体の部位・プレイの魅力・個性を具体的に。絵文字を適度に使って。絶対に短くしないこと）"
+}`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        messages:[{role:'user',content:prompt}]
+      })
+    });
+    const data = await res.json();
+    const raw = data.content?.[0]?.text || '{}';
+    const clean = raw.replace(/```json|```/g,'').trim();
+    const parsed = JSON.parse(clean);
+    generatedText = JSON.stringify({...parsed, cast});
+
+    // ステータス更新
+    const idx = casts.findIndex(c=>c.id===currentCastId);
+    casts[idx].status = 'done';
+    casts[idx].generatedCastComment = parsed.castComment;
+    casts[idx].generatedManagerComment = parsed.managerComment;
+    renderSidebar();
+
+  } catch(e) {
+    // フォールバック
+    const fb = {
+      castComment: `${cast.comment || `${cast.name}です！よろしくお願いします`}`,
+      managerComment: `${cast.name}ちゃんは${(cast.vibes||[]).join('・')}な子です。${cast.skill || 'プレイ上手'}で大人気！ぜひ一度会いに来てください♡`,
+      cast
+    };
+    generatedText = JSON.stringify(fb);
+    casts.find(c=>c.id===currentCastId).generatedCastComment = fb.castComment;
+    casts.find(c=>c.id===currentCastId).generatedManagerComment = fb.managerComment;
+  }
+
+  document.getElementById('loading').classList.remove('show');
+  document.getElementById('gen-btn').disabled = false;
+  renderGenTab(casts.find(c=>c.id===currentCastId));
+}
+
+// =========================================================
+//  プロフプレビュー描画
+// =========================================================
+function renderProfPreview(jsonStr) {
+  try {
+    const d = JSON.parse(jsonStr);
+    const cast = d.cast || casts.find(c=>c.id===currentCastId);
+    const castComment = d.castComment || '';
+    const managerComment = d.managerComment || '';
+
+    const okOpts  = OPT_ALL.filter(o=>['◎','○'].includes(cast.options?.[o]));
+    const sankOpts= OPT_ALL.filter(o=>cast.options?.[o]==='△');
+    const ngOpts  = OPT_ALL.filter(o=>cast.options?.[o]==='×');
+
+    const specRows = [
+      ['名前',           cast.name],
+      ['年齢',           cast.age ? cast.age + '歳' : '—'],
+      ['サイズ',         cast.size || '—'],
+      ['Pサイズ',        cast.psize || '—'],
+      ['状態（竿/玉）',  cast.state || '—'],
+      ['性格',           cast.personality || '—'],
+      ['趣味',           cast.hobby || '—'],
+      ['プレイスタイル', (cast.vibes||[]).join('・') || '—'],
+      ['性感帯',         cast.erogenous || '—'],
+      ['熟練度',         cast.tabako || '—'],
+      ['チャームポイント', cast.charm || '—'],
+      ['得意技',         cast.skill || '—'],
+      ['状態（竿/玉）',  cast.state || '—'],
+      ['髪の毛',         cast.hair || '—'],
+    ];
+    return `
+      <div style="margin-bottom:18px">
+        ${specRows.map(([label, val]) => `
+          <div style="display:flex;border-bottom:1px solid var(--border);padding:8px 0">
+            <div style="width:140px;font-size:12px;font-weight:700;color:var(--text2);flex-shrink:0">${label}</div>
+            <div style="font-size:13px;color:var(--text);flex:1">${val}</div>
+          </div>`).join('')}
+      </div>
+      <div class="prof-section">
+        <div class="prof-section-title">本人から一言</div>
+        <div class="prof-text">${castComment.replace(/\n/g,'<br>')}</div>
+      </div>
+      <div class="prof-section">
+        <div class="prof-section-title">店長から一言</div>
+        <div class="prof-text">${managerComment.replace(/\n/g,'<br>')}</div>
+      </div>
+      <div class="prof-section">
+        <div class="prof-section-title">オプション</div>
+        <div class="prof-opts">
+          ${okOpts.map(o=>`<span class="prof-opt-tag tag-maru">◎ ${o}</span>`).join('')}
+          ${sankOpts.map(o=>`<span class="prof-opt-tag tag-sankaku">△ ${o}</span>`).join('')}
+          ${ngOpts.map(o=>`<span class="prof-opt-tag tag-batu">× ${o}</span>`).join('')}
+        </div>
+      </div>
+    `;
+  } catch(e) { return '<div>表示エラー</div>'; }
+}
+
+// =========================================================
+//  回答ページへ反映
+// =========================================================
+function applyToAnswer() {
+  if (!generatedText) return;
+  try {
+    const d = JSON.parse(generatedText);
+    const idx = casts.findIndex(c => c.id === currentCastId);
+    casts[idx].generatedCastComment    = d.castComment;
+    casts[idx].generatedManagerComment = d.managerComment;
+    casts[idx].status = 'done';
+    // LocalStorageも更新
+    try {
+      const saved = JSON.parse(localStorage.getItem('sakuraMoonCasts') || '[]');
+      const si = saved.findIndex(c => c.id === currentCastId);
+      if (si !== -1) {
+        saved[si].generatedCastComment    = d.castComment;
+        saved[si].generatedManagerComment = d.managerComment;
+        saved[si].status = 'done';
+        localStorage.setItem('sakuraMoonCasts', JSON.stringify(saved));
+      }
+    } catch(e) {}
+    renderSidebar();
+    switchTab('answer');
+    showToast('✅ 回答ページへ反映しました！');
+  } catch(e) { showToast('反映に失敗しました'); }
+}
+
+// =========================================================
+//  完成プロフ全文コピー
+// =========================================================
+function copyCompleted() {
+  const cast = casts.find(c => c.id === currentCastId);
+  if (!cast?.generatedCastComment) return;
+  const okOpts   = OPT_ALL.filter(o => ['◎','○'].includes(cast.options?.[o]));
+  const sankOpts = OPT_ALL.filter(o => cast.options?.[o] === '△');
+  const ngOpts   = OPT_ALL.filter(o => cast.options?.[o] === '×');
+  const text =
+`【${cast.name}】
+${cast.age}歳 / ${cast.size} / Pサイズ：${cast.psize}
+状態（竿/玉）：${cast.state} / 髪の毛：${cast.hair}
+性格：${cast.personality} / 趣味：${cast.hobby}
+チャームポイント：${cast.charm} / タバコ：${cast.tabako}
+性感帯：${cast.erogenous} / 得意技：${cast.skill}
+
+■ 本人から一言
+${cast.generatedCastComment}
+
+■ 店長から一言
+${cast.generatedManagerComment}
+
+■ オプション
+OK：${okOpts.join(' / ')}
+△：${sankOpts.join(' / ') || 'なし'}
+NG：${ngOpts.join(' / ') || 'なし'}`;
+  navigator.clipboard.writeText(text).then(() => showToast('📋 完成プロフをコピーしました！'));
+}
+
+function copyProf() {
+  try {
+    const d = JSON.parse(generatedText);
+    const cast = d.cast || casts.find(c=>c.id===currentCastId);
+    const okOpts  = OPT_ALL.filter(o=>['◎','○'].includes(cast.options?.[o]));
+    const sankOpts= OPT_ALL.filter(o=>cast.options?.[o]==='△');
+    const ngOpts  = OPT_ALL.filter(o=>cast.options?.[o]==='×');
+
+    const text = `【${cast.name}】
+${cast.age}歳 / ${cast.size} / Pサイズ：${cast.psize}
+状態（竿/玉）：${cast.state} / 髪の毛：${cast.hair}
+性格：${cast.personality}
+趣味：${cast.hobby}
+チャームポイント：${cast.charm} / タバコ：${cast.tabako}
+
+■ 本人から一言
+${d.castComment}
+
+■ 店長から一言
+${d.managerComment}
+
+■ オプション
+OK：${okOpts.join(' / ')}
+△：${sankOpts.join(' / ') || 'なし'}
+NG：${ngOpts.join(' / ') || 'なし'}`;
+
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById('copy-btn');
+      if (btn) { btn.textContent = '✅ コピーしました！'; btn.classList.add('copied'); }
+      showToast('プロフ全文をコピーしました！');
+      setTimeout(() => {
+        if (btn) { btn.textContent = '📋 全文コピー'; btn.classList.remove('copied'); }
+      }, 2500);
+    });
+  } catch(e) { showToast('コピーに失敗しました'); }
+}
+
+// =========================================================
+//  トースト
+// =========================================================
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// =========================================================
+//  キャスト削除
+// =========================================================
+function deleteCast(id) {
+  const cast = casts.find(c => String(c.id) === String(id));
+  if (!cast) return;
+  if (!confirm(`「${cast.name}」を削除しますか？\n（全てのPCで削除されます）`)) return;
+
+  // GASに削除フラグをPOST
+  fetch(GAS_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ _type: 'delete', id: cast.id, name: cast.name })
+  }).catch(e => console.warn('GAS削除エラー:', e));
+
+  // ローカルからも削除
+  casts = casts.filter(c => String(c.id) !== String(id));
+  saveCastsCache();
+  if (currentCastId === cast.id) {
+    currentCastId = null;
+    document.getElementById('topbar-name').textContent = 'キャストを選択してください';
+    document.getElementById('topbar-status').innerHTML = '';
+    document.getElementById('tab-wrap').style.display = 'none';
+    document.getElementById('main-content').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">👈</div>
+        <div class="empty-title">キャストを選んでください</div>
+        <div class="empty-sub">左のリストからキャストを選ぶと<br>回答内容とプロフ生成ができます</div>
+      </div>`;
+  }
+  renderSidebar();
+  showToast(`🗑️ ${cast.name}を削除しました`);
+}
+
+
+function openModal() { document.getElementById('modal').classList.add('show'); }
+function closeModal() { document.getElementById('modal').classList.remove('show'); }
+
+function addManualCast() {
+  const name = document.getElementById('m-name').value.trim();
+  if (!name) { showToast('源氏名は必須です！'); return; }
+  const newCast = {
+    id: Date.now(),
+    name, 
+    age: parseInt(document.getElementById('m-age').value) || 0,
+    size: document.getElementById('m-size').value,
+    psize: document.getElementById('m-psize').value,
+    state: document.getElementById('m-state').value,
+    hair: document.getElementById('m-hair').value,
+    personality: document.getElementById('m-personality').value,
+    hobby: document.getElementById('m-hobby').value,
+    charm: document.getElementById('m-charm').value,
+    tabako: document.getElementById('m-tabako').value,
+    erogenous: document.getElementById('m-erogenous').value,
+    skill: document.getElementById('m-skill').value,
+    comment: document.getElementById('m-comment').value,
+    internal: document.getElementById('m-internal').value,
+    vibes: [], options: {}, optMemo: {},
+    status: 'draft',
+    colorIdx: casts.length % AVATAR_COLORS.length
+  };
+  casts.push(newCast);
+  saveCastsCache();
+  closeModal();
+  renderSidebar();
+  selectCast(newCast.id);
+  showToast(`${name}さんを追加しました！`);
+  // モーダルリセット
+  ['m-name','m-age','m-size','m-psize','m-state','m-hair','m-personality','m-hobby','m-charm','m-tabako','m-erogenous','m-skill','m-comment','m-internal']
+    .forEach(id => { document.getElementById(id).value = ''; });
+}
+
+// =========================================================
+//  GAS連携
+// =========================================================
+const GAS_CODE = `// ===== Google Apps Script コード =====
+// スプレッドシートのIDは自動取得します
+
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // --- シート1: キャスト基本情報 ---
+    let sheet1 = ss.getSheetByName('キャスト一覧');
+    if (!sheet1) {
+      sheet1 = ss.insertSheet('キャスト一覧');
+      sheet1.appendRow([
+        'ID','提出日時','源氏名','年齢','サイズ','Pサイズ','状態(竿/玉)','髪の毛',
+        '性格','趣味','チャームポイント','タバコ','性感帯','得意技',
+        '雰囲気','一言素材','内勤連絡事項'
+      ]);
+    }
+    sheet1.appendRow([
+      data.id,
+      data.submittedAt,
+      data.name, data.age, data.size, data.psize, data.state, data.hair,
+      data.personality, data.hobby, data.charm, data.tabako,
+      data.erogenous, data.skill,
+      (data.vibes||[]).join('・'),
+      data.comment,
+      data.internal
+    ]);
+
+    // --- シート2: オプション可否 ---
+    let sheet2 = ss.getSheetByName('オプション');
+    if (!sheet2) {
+      sheet2 = ss.insertSheet('オプション');
+      const optHeaders = ['ID','源氏名',
+        'AF','逆AF','前立腺マッサージ','兜合わせ','玉舐め','キス','全身リップ',
+        '乳首責め','生フェラ','69','Sプレイ','Mプレイ','お泊りコース','デートコース',
+        '女装されているお客様','外国人のお客様',
+        'キャスト射精（有料）','コース内キャスト2回以上射精（有料）',
+        '3P／お客様2名（有料）','3P／キャスト2名（有料）',
+        'コスプレ（有料）','ごっくん（有料）','聖水（有料）'
+      ];
+      sheet2.appendRow(optHeaders);
+    }
+    const opts = data.options || {};
+    sheet2.appendRow([
+      data.id, data.name,
+      opts['AF']||'', opts['逆AF']||'', opts['前立腺マッサージ']||'',
+      opts['兜合わせ']||'', opts['玉舐め']||'', opts['キス']||'',
+      opts['全身リップ']||'', opts['乳首責め']||'', opts['生フェラ']||'',
+      opts['69']||'', opts['Sプレイ']||'', opts['Mプレイ']||'',
+      opts['お泊りコース']||'', opts['デートコース']||'',
+      opts['女装されているお客様']||'', opts['外国人のお客様']||'',
+      opts['キャスト射精（有料）']||'', opts['コース内キャスト2回以上射精（有料）']||'',
+      opts['3P／お客様2名（有料）']||'', opts['3P／キャスト2名（有料）']||'',
+      opts['コスプレ（有料）']||'', opts['ごっくん（有料）']||'', opts['聖水（有料）']||''
+    ]);
+
+    return ContentService
+      .createTextOutput(JSON.stringify({result:'ok', name: data.name}))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch(err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({result:'error', message: err.toString()}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doGet(e) {
+  return ContentService
+    .createTextOutput(JSON.stringify({result:'ok', message:'GAS動作確認OK'}))
+    .setMimeType(ContentService.MimeType.JSON);
+}`;
+
+function openGasModal() {
+  const saved = localStorage.getItem('sakuraMoon_gasUrl') || '';
+  document.getElementById('gas-url-input').value = saved;
+  const msg = document.getElementById('gas-status-msg');
+  if (saved) {
+    msg.innerHTML = '✅ 現在のURL：<br><small style="word-break:break-all">' + saved + '</small>';
+    msg.style.display = 'block';
+  } else {
+    msg.innerHTML = '未設定です。上の手順でGASをデプロイしてURLを貼り付けてください。';
+    msg.style.background = 'var(--yellow-soft)';
+    msg.style.borderColor = 'var(--yellow)';
+    msg.style.color = '#7a6010';
+  }
+  document.getElementById('gas-modal').classList.add('show');
+}
+
+function closeGasModal() {
+  document.getElementById('gas-modal').classList.remove('show');
+}
+
+function saveGasUrl() {
+  const url = document.getElementById('gas-url-input').value.trim();
+  if (!url) { showToast('URLを入力してください'); return; }
+  if (!url.startsWith('https://script.google.com/')) {
+    showToast('正しいGAS URLを入力してください'); return;
+  }
+  localStorage.setItem('sakuraMoon_gasUrl', url);
+  closeGasModal();
+  showToast('✅ GAS URLを保存しました！');
+}
+
+function copyGasCode() {
+  navigator.clipboard.writeText(GAS_CODE).then(() => {
+    showToast('📋 GASコードをコピーしました！Apps Scriptに貼り付けてください');
+  });
+}
+
+// GASへプロフ生成結果を送信
+async function sendGeneratedToGAS(cast) {
+  const url = localStorage.getItem('sakuraMoon_gasUrl') || '';
+  if (!url) return;
+  try {
+    await fetch(url, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...cast,
+        _type: 'prof_generated',
+        generatedAt: new Date().toISOString()
+      })
+    });
+  } catch(e) {}
+}
+
+// =========================================================
+//  初期化：LocalStorageからフォーム提出データをマージ
+// =========================================================
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwC5lgUrJfd-PVvZQ2k7LS2SDbUO2V7g-3pOT_BLnyRM9RYQIlLKEEqUCE9vkRAmEADLQ/exec';
+
+async function init() {
+  renderSidebar(); // キャッシュから即表示
+  await loadFromGAS();
+}
+
+async function loadFromGAS() {
+  try {
+    // 常に全件取得して削除済みを確実に除去する
+    const res  = await fetch(`${GAS_URL}?action=getCasts`);
+    const data = await res.json();
+
+    if (data.result === 'ok') {
+      const gasCasts = data.casts || [];
+      const validIds = new Set(gasCasts.map(c => String(c.id)));
+
+      // 削除済みをローカルから除去（手動追加draftは残す）
+      casts = casts.filter(c => c.status === 'draft' || validIds.has(String(c.id)));
+
+      // 新規・更新をマージ
+      let newCount = 0;
+      gasCasts.forEach(c => {
+        c.status   = c.status   || 'new';
+        c.colorIdx = c.colorIdx != null ? c.colorIdx : (casts.length % 8);
+        const idx  = casts.findIndex(x =>
+          String(x.id) === String(c.id) || x.name === c.name
+        );
+        if (idx >= 0) {
+          casts[idx] = { ...casts[idx], ...c };
+        } else {
+          casts.push(c);
+          newCount++;
+        }
+      });
+
+      if (data.serverTime) {
+        localStorage.setItem('sakuraMoon_lastSync', data.serverTime);
+      }
+      saveCastsCache();
+      renderSidebar();
+      if (newCount > 0) {
+        showToast(`🆕 新着 ${newCount}件 を受け取りました`);
+      }
+    }
+  } catch(e) {
+    console.warn('GAS読み込みエラー:', e);
+  }
+}
+
+// GASへプロフ生成結果を反映
+async function saveGeneratedToGAS(cast) {
+  try {
+    await fetch(GAS_URL, {
+      method: 'POST',
+      mode:   'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...cast,
+        _type: 'prof_generated',
+        generatedAt: new Date().toISOString()
+      })
+    });
+  } catch(e) {}
+}
+
+// init()は認証成功後に呼ばれます
+</script>
+</body>
+</html>

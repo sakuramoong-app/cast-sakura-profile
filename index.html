@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>プロフ作成フォーム</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700;900&family=Quicksand:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --pink:      #FF8FAB;
+  --pink-mid:  #FFB3C6;
+  --pink-soft: #FFE0EA;
+  --pink-bg:   #FFF5F8;
+  --yellow:    #FFD966;
+  --yellow-soft:#FFF8D6;
+  --mint:      #B8F0D8;
+  --mint-soft: #E8FBF2;
+  --lavender:  #C8AAEE;
+  --lav-soft:  #F3EDFF;
+  --text:      #3D2B35;
+  --text-sub:  #9A7D87;
+  --border:    #F0C8D5;
+  --white:     #FFFFFF;
+  --card-bg:   #FFFBFC;
+  --error:     #FF4D6D;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font-family:'Noto Sans JP',sans-serif;
+  background:linear-gradient(160deg,#FFF5F8 0%,#FFF8D6 45%,#F3EDFF 100%);
+  min-height:100vh;color:var(--text);
+}
+body::before{
+  content:'';position:fixed;inset:0;
+  background:
+    radial-gradient(circle at 10% 15%,rgba(255,143,171,.15) 0%,transparent 40%),
+    radial-gradient(circle at 90% 80%,rgba(255,217,102,.15) 0%,transparent 40%),
+    radial-gradient(circle at 60% 40%,rgba(200,170,238,.1) 0%,transparent 40%);
+  pointer-events:none;z-index:0;
+}
+.app{position:relative;z-index:1;max-width:520px;margin:0 auto;padding:0 0 100px;}
+
+/* HEADER */
+.header{text-align:center;padding:36px 24px 20px;}
+.header-badge{
+  display:inline-block;background:var(--pink);color:#fff;
+  font-family:'Quicksand',sans-serif;font-size:11px;letter-spacing:3px;
+  padding:5px 16px;border-radius:20px;margin-bottom:12px;
+}
+.header h1{font-size:22px;font-weight:900;line-height:1.4;}
+.header h1 em{font-style:normal;color:var(--pink);}
+.header-sub{font-size:13px;color:var(--text-sub);margin-top:6px;line-height:1.7;}
+
+/* PROGRESS */
+.progress-wrap{padding:0 24px 20px;}
+.progress-meta{
+  display:flex;justify-content:space-between;
+  font-size:11px;color:var(--text-sub);margin-bottom:6px;
+  font-family:'Quicksand',sans-serif;font-weight:700;
+}
+.progress-track{height:6px;background:var(--pink-soft);border-radius:10px;overflow:hidden;}
+.progress-fill{
+  height:100%;background:linear-gradient(90deg,var(--pink),var(--yellow));
+  border-radius:10px;transition:width .5s cubic-bezier(.4,0,.2,1);
+}
+
+/* STEP */
+.step{display:none;padding:0 20px;animation:slideUp .4s ease both;}
+.step.active{display:block;}
+@keyframes slideUp{from{opacity:0;transform:translateY(24px);}to{opacity:1;transform:translateY(0);}}
+.step-tag{
+  display:inline-flex;align-items:center;gap:6px;
+  background:var(--pink-soft);color:var(--pink);
+  font-size:11px;font-weight:700;letter-spacing:2px;
+  padding:4px 12px;border-radius:20px;margin-bottom:10px;
+}
+.step-title{font-size:20px;font-weight:900;line-height:1.35;margin-bottom:6px;}
+.step-desc{font-size:13px;color:var(--text-sub);line-height:1.7;}
+
+/* CARD */
+.card{
+  background:var(--white);border:1.5px solid var(--border);
+  border-radius:18px;padding:18px;margin-bottom:14px;
+  box-shadow:0 2px 12px rgba(255,143,171,.08);
+}
+.card-title{
+  font-size:12px;font-weight:700;letter-spacing:1px;
+  color:var(--pink);margin-bottom:12px;
+  display:flex;align-items:center;gap:6px;
+}
+
+/* FIELD */
+.field{margin-bottom:14px;}
+.field:last-child{margin-bottom:0;}
+.field-label{font-size:12px;font-weight:700;color:var(--text-sub);margin-bottom:6px;display:block;}
+.field-input,.field-textarea{
+  width:100%;background:var(--pink-bg);
+  border:1.5px solid var(--border);border-radius:10px;
+  padding:11px 14px;font-size:14px;color:var(--text);
+  font-family:inherit;outline:none;
+  transition:border-color .2s,background .2s;-webkit-appearance:none;
+}
+.field-input:focus,.field-textarea:focus{border-color:var(--pink);background:#fff;}
+.field-input::placeholder,.field-textarea::placeholder{color:rgba(155,120,130,.4);font-size:13px;}
+.field-textarea{resize:none;line-height:1.7;}
+.char-hint{font-size:11px;color:var(--text-sub);margin-top:4px;text-align:right;}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+
+/* REQUIRED */
+.req{color:var(--error);font-size:11px;margin-left:4px;}
+.field-error{
+  font-size:11px;color:var(--error);margin-top:4px;
+  display:none;
+}
+.field-input.invalid,.field-textarea.invalid{border-color:var(--error)!important;}
+
+/* NOTE */
+.note-box{
+  background:var(--yellow-soft);border:1.5px solid var(--yellow);
+  border-radius:12px;padding:12px 14px;
+  font-size:12px;color:#7a6010;line-height:1.7;margin-bottom:14px;
+}
+.note-box strong{color:#c07000;}
+
+/* RADIO GROUP (タバコ等) */
+.radio-group{display:flex;gap:12px;flex-wrap:wrap;margin-top:4px;}
+.radio-group label{
+  display:flex;align-items:center;gap:6px;
+  font-size:14px;cursor:pointer;
+  background:var(--pink-bg);border:1.5px solid var(--border);
+  border-radius:10px;padding:8px 14px;transition:all .15s;
+}
+.radio-group label:has(input:checked){
+  background:var(--pink-soft);border-color:var(--pink);color:var(--pink);font-weight:700;
+}
+.radio-group input[type=radio]{accent-color:var(--pink);}
+
+/* ===== OPTION TABLE ===== */
+.opt-all-btn-wrap{
+  display:flex;justify-content:center;padding:8px 0;
+}
+.opt-all-btn{
+  background:linear-gradient(135deg,var(--pink),#FF6B9D);
+  border:none;border-radius:30px;
+  padding:9px 24px;font-size:13px;font-weight:700;
+  color:#fff;cursor:pointer;font-family:inherit;
+  box-shadow:0 3px 12px rgba(255,107,157,.25);
+  transition:all .2s;letter-spacing:.5px;
+}
+.opt-all-btn:hover{transform:translateY(-1px);box-shadow:0 5px 16px rgba(255,107,157,.35);}
+
+.opt-section-head{
+  background:var(--pink-soft);
+  font-size:11px;font-weight:700;color:var(--pink);
+  padding:6px 10px;letter-spacing:1px;border-radius:8px;
+  margin:10px 0 6px;
+}
+.opt-item{
+  background:var(--pink-bg);border:1.5px solid var(--border);
+  border-radius:14px;padding:12px 14px;margin-bottom:8px;
+}
+.opt-item-top{display:flex;align-items:flex-start;gap:8px;}
+.opt-name-block{flex:1;}
+.opt-name{font-size:14px;font-weight:700;color:var(--text);}
+.opt-desc{font-size:11px;color:var(--text-sub);line-height:1.5;margin-top:3px;}
+.opt-radio-group{
+  display:flex;gap:5px;align-items:center;flex-shrink:0;margin-top:2px;
+}
+.opt-radio-hidden{display:none;}
+.opt-label-btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:32px;height:32px;border-radius:50%;
+  border:1.5px solid var(--border);
+  font-size:13px;font-weight:700;
+  cursor:pointer;color:var(--text-sub);
+  transition:all .15s;
+}
+.opt-radio-hidden:checked + .opt-label-btn{color:#fff;border-color:transparent;}
+.opt-radio-hidden[value="◎"]:checked + .opt-label-btn{background:var(--pink);}
+.opt-radio-hidden[value="○"]:checked + .opt-label-btn{background:#FF9EC5;}
+.opt-radio-hidden[value="△"]:checked + .opt-label-btn{background:var(--yellow);color:var(--text);}
+.opt-radio-hidden[value="×"]:checked + .opt-label-btn{background:#bbb;}
+.opt-memo{
+  width:100%;background:rgba(255,255,255,.8);
+  border:1.5px solid var(--border);border-radius:8px;
+  padding:8px 12px;font-size:12px;color:var(--text);
+  font-family:inherit;outline:none;margin-top:10px;
+  transition:border-color .2s;
+}
+.opt-memo:focus{border-color:var(--pink);}
+.opt-memo::placeholder{color:rgba(155,120,130,.45);font-size:12px;}
+
+/* 3P分岐 */
+.threep-sub{
+  display:none;margin-top:10px;padding:10px;
+  background:rgba(255,255,255,.7);border-radius:10px;
+  border:1px solid var(--border);
+}
+.threep-sub.show{display:block;}
+.threep-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px;}
+.threep-row:last-child{margin-bottom:0;}
+.threep-label{flex:1;color:var(--text);}
+
+/* CHIPS */
+.chip-group{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px;}
+.chip{
+  border:1.5px solid var(--border);border-radius:20px;padding:7px 14px;
+  font-size:12px;color:var(--text-sub);cursor:pointer;
+  transition:all .15s;background:var(--white);font-family:inherit;
+}
+.chip:hover{border-color:var(--pink);color:var(--pink);}
+.chip.selected{background:var(--pink);border-color:var(--pink);color:#fff;font-weight:700;}
+
+/* BUBBLE */
+.bubble-wrap{display:flex;gap:10px;align-items:flex-start;margin-bottom:16px;}
+.bubble-icon{
+  width:38px;height:38px;border-radius:50%;
+  background:linear-gradient(135deg,var(--pink),var(--lavender));
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;flex-shrink:0;box-shadow:0 2px 8px rgba(255,143,171,.3);
+}
+.bubble-text{
+  background:var(--white);border:1.5px solid var(--border);
+  border-radius:6px 16px 16px 16px;
+  padding:12px 14px;font-size:13px;line-height:1.8;
+  color:var(--text);flex:1;
+}
+.bubble-text strong{color:var(--pink);}
+
+/* INTERNAL CARD */
+.internal-card{
+  background:var(--lav-soft);border:1.5px solid var(--lavender);
+  border-radius:18px;padding:18px;margin-bottom:14px;
+}
+.internal-label{font-size:11px;font-weight:700;letter-spacing:2px;color:#7B5EA7;margin-bottom:4px;}
+.internal-title{font-size:16px;font-weight:700;color:var(--text);margin-bottom:12px;}
+.free-area{
+  width:100%;background:#fff;border:1.5px solid var(--lavender);
+  border-radius:12px;padding:14px;font-size:14px;color:var(--text);
+  font-family:inherit;outline:none;resize:none;min-height:140px;line-height:1.8;
+  transition:border-color .2s;
+}
+.free-area:focus{border-color:#9B72CF;}
+.free-area::placeholder{color:rgba(155,120,160,.4);font-size:13px;}
+
+/* PREVIEW (step5) */
+.preview-card{
+  background:var(--white);border:1.5px solid var(--border);
+  border-radius:18px;padding:18px;margin-bottom:14px;
+}
+.preview-content{
+  background:var(--pink-bg);border:1.5px solid var(--border);
+  border-radius:12px;padding:14px;
+  font-size:13px;color:var(--text);line-height:1.9;
+  white-space:pre-line;max-height:320px;overflow-y:auto;
+}
+
+/* BUTTONS */
+.btn-next{
+  width:100%;background:linear-gradient(135deg,var(--pink) 0%,#FF6B9D 100%);
+  border:none;border-radius:14px;padding:16px;font-size:15px;font-weight:700;
+  color:#fff;cursor:pointer;font-family:inherit;letter-spacing:.5px;margin-top:20px;
+  box-shadow:0 4px 18px rgba(255,107,157,.28);transition:all .25s;
+}
+.btn-next:hover{transform:translateY(-2px);box-shadow:0 7px 26px rgba(255,107,157,.35);}
+.btn-next:active{transform:translateY(0);}
+.btn-secondary{
+  width:100%;background:transparent;border:1.5px solid var(--pink-mid);
+  border-radius:14px;padding:13px;font-size:14px;font-weight:700;
+  color:var(--pink);cursor:pointer;font-family:inherit;margin-top:8px;transition:all .2s;
+}
+.btn-secondary:hover{background:var(--pink-soft);}
+.btn-back{
+  width:100%;background:transparent;border:1.5px solid var(--border);
+  border-radius:14px;padding:13px;font-size:14px;font-weight:700;
+  color:var(--text-sub);cursor:pointer;font-family:inherit;margin-top:8px;transition:all .2s;
+}
+.btn-back:hover{border-color:var(--pink);color:var(--pink);}
+.btn-submit{
+  width:100%;background:linear-gradient(135deg,#A8EDCC,#6ED4A8);
+  border:none;border-radius:14px;padding:16px;font-size:15px;font-weight:700;
+  color:#1a5c40;cursor:pointer;font-family:inherit;letter-spacing:.5px;margin-top:20px;
+  box-shadow:0 4px 18px rgba(110,212,168,.3);transition:all .25s;
+}
+.btn-submit:hover{transform:translateY(-2px);}
+
+/* TOAST / ERROR BANNER */
+.err-banner{
+  display:none;background:#FFF0F3;border:1.5px solid var(--error);
+  border-radius:12px;padding:12px 16px;margin-top:12px;
+  font-size:13px;color:var(--error);font-weight:700;
+  animation:shakeX .3s ease;
+}
+.err-banner.show{display:block;}
+@keyframes shakeX{
+  0%,100%{transform:translateX(0);}
+  25%{transform:translateX(-6px);}
+  75%{transform:translateX(6px);}
+}
+
+/* COMPLETE */
+.complete-wrap{text-align:center;padding:48px 24px;}
+.complete-emoji{font-size:64px;display:block;margin-bottom:16px;animation:bounce .6s ease;}
+@keyframes bounce{0%,100%{transform:scale(1);}50%{transform:scale(1.2);}}
+.complete-title{font-size:24px;font-weight:900;margin-bottom:8px;}
+.complete-sub{font-size:14px;color:var(--text-sub);line-height:1.8;}
+
+/* scrollbar */
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-thumb{background:var(--pink-mid);border-radius:2px;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-badge">✦ PROFILE FORM ✦</div>
+    <h1>プロフ作成フォームへ<br><em>ようこそ！</em> 🌸</h1>
+    <div class="header-sub">楽しく答えていただくだけで<br>素敵なプロフが完成しますよ♪</div>
+    <div style="margin-top:12px;background:var(--yellow-soft);border:1.5px solid var(--yellow);border-radius:12px;padding:10px 14px;font-size:12px;color:#7a6010;line-height:1.7;">
+      ⚠️ 途中でタブを閉じると入力内容が消えます。<br>
+      「提出する」ボタンを押すまでタブは閉じないでください！
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap">
+    <div class="progress-meta">
+      <span id="prog-label">STEP 1 / 5</span>
+      <span id="prog-pct">0%</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="prog-fill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- ====================================================
+       STEP 1: 基本情報
+  ==================================================== -->
+  <div class="step active" id="step-1">
+    <div style="margin-bottom:20px">
+      <div class="step-tag">📋 STEP 01</div>
+      <div class="step-title">基本情報を教えてください！</div>
+      <div class="step-desc">お客様に公開される基本プロフィールです。<br><span style="color:var(--error);font-size:12px">※ すべて必須項目です</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🌸 名前・年齢</div>
+      <div class="field">
+        <label class="field-label">源氏名<span class="req">必須</span></label>
+        <input class="field-input" id="f-name" type="text" placeholder="例：さくら" maxlength="20">
+      </div>
+      <div class="field">
+        <label class="field-label">年齢<span class="req">必須</span></label>
+        <input class="field-input" id="f-age" type="number" placeholder="例：22" min="18" max="60" style="max-width:110px">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📐 サイズ</div>
+      <div class="note-box">
+        <strong>記入例：</strong>T175-B79(A)-W61-H83<br>
+        Pサイズは特徴（太め・細め）があればぜひ書いてください！
+      </div>
+      <div class="field">
+        <label class="field-label">T・B(カップ)・W・H<span class="req">必須</span></label>
+        <input class="field-input" id="f-size" type="text" placeholder="例：T158-B82(D)-W58-H85">
+      </div>
+      <div class="field">
+        <label class="field-label">Pサイズ（勃起時）・特徴があれば<span class="req">必須</span></label>
+        <input class="field-input" id="f-psize" type="text" placeholder="例：15、太め　など"><span style="font-size:13px;color:var(--text-sub);margin-left:6px">cm</span>
+      </div>
+      <div class="field">
+        <label class="field-label">状態（竿 / 玉）<span class="req">必須</span></label>
+        <div class="radio-group" id="state-group">
+          <label><input type="radio" name="state" value="あり/あり"> あり / あり</label>
+          <label><input type="radio" name="state" value="あり/なし"> あり / なし</label>
+          <label><input type="radio" name="state" value="なし/なし"> なし / なし</label>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">髪の毛<span class="req">必須</span></label>
+        <div class="radio-group" id="hair-group">
+          <label><input type="radio" name="hair" value="地毛"> 地毛</label>
+          <label><input type="radio" name="hair" value="ウィッグ"> ウィッグ</label>
+          <label><input type="radio" name="hair" value="地毛＋ウィッグ"> 両方あり</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">✨ プロフィール</div>
+      <div class="field">
+        <label class="field-label">性格<span class="req">必須</span></label>
+        <input class="field-input" id="f-personality" type="text" placeholder="例：人見知りだけどしゃべり出すと止まらない">
+      </div>
+      <div class="field">
+        <label class="field-label">趣味<span class="req">必須</span></label>
+        <input class="field-input" id="f-hobby" type="text" placeholder="例：カフェ巡り、映画鑑賞、ゲーム">
+      </div>
+      <div class="field">
+        <label class="field-label">チャームポイント<span class="req">必須</span></label>
+        <input class="field-input" id="f-charm" type="text" placeholder="例：えくぼ、くびれ、笑顔">
+      </div>
+      <div class="field">
+        <label class="field-label">タバコ<span class="req">必須</span></label>
+        <div class="radio-group">
+          <label><input type="radio" name="tabako" value="喫煙者"> 喫煙者</label>
+          <label><input type="radio" name="tabako" value="非喫煙者"> 非喫煙者</label>
+          <label><input type="radio" name="tabako" value="電子タバコのみ"> 電子のみ</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">💫 プレイ情報</div>
+      <div class="field">
+        <label class="field-label">性感帯<span class="req">必須</span></label>
+        <input class="field-input" id="f-erogenous" type="text" placeholder="例：耳、首筋、胸">
+      </div>
+      <div class="field">
+        <label class="field-label">得意技<span class="req">必須</span></label>
+        <input class="field-input" id="f-skill" type="text" placeholder="例：じらすのが得意、フェラに自信あり">
+      </div>
+    </div>
+
+    <div id="err-1" class="err-banner">⚠️ 未入力・未選択の項目があります。すべて入力してから次へ進んでください！</div>
+    <button class="btn-next" onclick="validateAndGo(2)">次へ進む →</button>
+  </div>
+
+  <!-- ====================================================
+       STEP 2: オプション可否
+  ==================================================== -->
+  <div class="step" id="step-2">
+    <div style="margin-bottom:20px">
+      <div class="step-tag">✅ STEP 02</div>
+      <div class="step-title">オプションの可否を<br>教えてください！</div>
+      <div class="step-desc">◎・○・△・× でお答えください。<br><span style="color:var(--error);font-size:12px">※ すべてのオプションに回答が必要です</span></div>
+    </div>
+
+    <div class="note-box">
+      <strong>嘘はいけませんが、◎が多いほど指名数もアップしやすいです✨</strong><br>
+      「これってどういう意味？」と思う項目は、お気軽に内勤へご相談ください！<br><br>
+      <strong>◎</strong>：大好き・自信あり　<strong>○</strong>：OK　<strong>△</strong>：条件つきOK　<strong>×</strong>：NG
+    </div>
+
+    <!-- オール◎ボタン (上) -->
+    <div class="opt-all-btn-wrap">
+      <button class="opt-all-btn" onclick="setAllMaru()">⭐ すべて ◎ にする</button>
+    </div>
+
+    <div id="opt-list"></div>
+
+    <!-- オール◎ボタン (下) -->
+    <div class="opt-all-btn-wrap" style="margin-top:4px;margin-bottom:4px">
+      <button class="opt-all-btn" onclick="setAllMaru()">⭐ すべて ◎ にする</button>
+    </div>
+
+    <div id="err-2" class="err-banner">⚠️ 全オプションに ◎○△× を選択してから次へ進んでください！</div>
+    <button class="btn-next" onclick="validateAndGo(3)">次へ進む →</button>
+    <button class="btn-back" onclick="goStep(1)">← 戻る</button>
+  </div>
+
+  <!-- ====================================================
+       STEP 3: コメント・雰囲気
+  ==================================================== -->
+  <div class="step" id="step-3">
+    <div style="margin-bottom:20px">
+      <div class="step-tag">💌 STEP 03</div>
+      <div class="step-title">お客様へのメッセージ＆<br>あなたの雰囲気を教えてください！</div>
+      <div class="step-desc"><span style="color:var(--error);font-size:12px">※ すべて必須項目です</span></div>
+    </div>
+
+    <div class="bubble-wrap">
+      <div class="bubble-icon">✨</div>
+      <div class="bubble-text">
+        お客様が<strong>「会いたい！」</strong>と思ってくださるような<br>
+        キーワードをいくつか教えていただけますか？🌷<br><br>
+        文章でも、単語の羅列でも大丈夫ですよ。<br>
+        <small style="color:var(--text-sub)">うまく書けなくても内勤がまとめますのでご安心を！</small>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">💬 キャストからのひとこと<span class="req">必須</span></div>
+      <div class="note-box">
+        キーワードだけでも、文章でもOKです！<br>
+        <strong>例：</strong>舌使い自信あり／じっくり攻めるのが好き／初めての方でも優しくリード／感度◎で一緒に楽しみたい
+      </div>
+      <textarea class="field-textarea" id="f-comment" rows="5"
+        placeholder="感度がよくて、一緒に気持ちよくなれます🔥&#10;ゆっくりじっくり楽しみましょ。&#10;初めての方も緊張しなくて大丈夫ですよ！"
+        maxlength="300" oninput="countChar(this,'cnt1',300)"></textarea>
+      <div class="char-hint"><span id="cnt1">0</span>/300</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🌈 あなたの雰囲気はどれに近いですか？（複数OK・<span class="req" style="font-size:11px">1つ以上選択</span>）</div>
+      <div class="chip-group" id="vibe-group"></div>
+    </div>
+
+    <div id="err-3" class="err-banner">⚠️ ひとことの入力と雰囲気の選択（1つ以上）が必要です！</div>
+    <button class="btn-next" onclick="validateAndGo(4)">次へ進む →</button>
+    <button class="btn-back" onclick="goStep(2)">← 戻る</button>
+  </div>
+
+  <!-- ====================================================
+       STEP 4: 内勤への連絡事項
+  ==================================================== -->
+  <div class="step" id="step-4">
+    <div style="margin-bottom:20px">
+      <div class="step-tag">🔒 STEP 04</div>
+      <div class="step-title">内勤スタッフへの<br>連絡事項があれば教えてください！</div>
+      <div class="step-desc">お客様には見えない、内勤だけが確認するページに記録します。<br>なければ「特になし」とご記入ください。</div>
+    </div>
+
+    <div class="internal-card">
+      <div class="internal-label">📝 内勤への伝言</div>
+      <div class="internal-title">特別な条件や注意事項など</div>
+      <div style="font-size:13px;color:#7B5EA7;margin-bottom:12px;line-height:1.7">
+        コースのNG・外国人の対応可否・その他気になることなど、<br>なんでも自由に書いてください！<br>
+        <small style="color:#9A7ABF"></small>
+      </div>
+      <textarea class="free-area" id="f-internal" rows="6"
+        placeholder=""></textarea>
+    </div>
+
+    <button class="btn-next" onclick="goStep(5)">入力内容を確認する →</button>
+    <button class="btn-back" onclick="goStep(3)">← 戻る</button>
+  </div>
+
+  <!-- ====================================================
+       STEP 5: 最終確認 → 提出
+  ==================================================== -->
+  <div class="step" id="step-5">
+    <div style="margin-bottom:20px">
+      <div class="step-tag">👀 STEP 05</div>
+      <div class="step-title">送信前の最終確認です！</div>
+      <div class="step-desc">内容をご確認いただき、問題なければ「内勤に提出する」を押してください。</div>
+    </div>
+
+    <div class="preview-card">
+      <div class="card-title">📄 あなたの回答まとめ</div>
+      <div class="preview-content" id="preview-content">（読み込み中…）</div>
+    </div>
+
+    <div style="background:var(--mint-soft);border:1.5px solid var(--mint);border-radius:14px;padding:14px;margin-bottom:14px;font-size:13px;color:#1a5c40;line-height:1.7">
+      ✅ この内容は<strong>お客様には公開されません</strong>。<br>
+      内勤スタッフが確認後、プロフを作成します✨<br>
+      修正したい場合は「← 戻る」で修正できます。
+    </div>
+
+    <button class="btn-submit" onclick="submitForm()">✉️ 内勤に提出する</button>
+    <button class="btn-back" onclick="goStep(4)">← 戻る・修正する</button>
+  </div>
+
+  <!-- ====================================================
+       完了
+  ==================================================== -->
+  <div class="step" id="step-complete">
+    <div class="complete-wrap">
+      <span class="complete-emoji">🎉</span>
+      <div class="complete-title">提出完了です！</div>
+      <div id="complete-name" style="font-size:16px;font-weight:700;color:var(--pink);margin:6px 0 16px"></div>
+      <div class="complete-sub">
+        内勤がご回答を確認して、<br>
+        <strong style="color:var(--text)">プロフを作成します✨</strong><br><br>
+        完成したらご連絡しますね！<br>
+        ご協力ありがとうございました🌸
+      </div>
+      <button class="btn-next" style="margin-top:32px" onclick="location.reload()">別のキャストのフォームを開く</button>
+    </div>
+  </div>
+
+</div><!-- /app -->
+<script>
+// =========================================================
+//  オプション定義
+// =========================================================
+const OPT_SECTIONS = [
+  {
+    label: 'プレイ系',
+    items: [
+      { id:'AF',       name:'AF',         desc:'アナルファック（キャストさんが挿入される側）' },
+      { id:'逆AF',     name:'逆AF',       desc:'キャストさんがお客様のアナルに挿入するプレイ' },
+      { id:'前立腺',   name:'前立腺マッサージ', desc:'指でお客様の前立腺を刺激するプレイ' },
+      { id:'兜合わせ', name:'兜合わせ',   desc:'お互いの性器を合わせてこすり合わせるプレイ' },
+      { id:'玉舐め',   name:'玉舐め',     desc:'お客様の玉（睾丸）を舐めるプレイ' },
+      { id:'キス',     name:'キス',       desc:'お口でのキス' },
+      { id:'全身リップ',name:'全身リップ',desc:'全身を唇で丁寧に愛撫するプレイ' },
+      { id:'乳首責め', name:'乳首責め',   desc:'キャストさんの乳首をお客様が責めるプレイ' },
+      { id:'生フェラ', name:'生フェラ',   desc:'コンドームなしでのフェラチオ' },
+      { id:'69',       name:'69',         desc:'お互いを同時に愛撫するプレイ' },
+      { id:'Sプレイ',  name:'Sプレイ',    desc:'キャストさんがSとして責める側になるプレイ' },
+      { id:'Mプレイ',  name:'Mプレイ',    desc:'キャストさんがMとして責められる側になるプレイ' },
+    ]
+  },
+  {
+    label: 'コース系',
+    items: [
+      { id:'お泊り',   name:'お泊りコース', desc:'朝まで一緒に過ごすコース' },
+      { id:'デート',   name:'デートコース', desc:'外出・デートから始まるコース' },
+    ]
+  },
+  {
+    label: 'お客様対応',
+    items: [
+      { id:'女装',     name:'女装されているお客様', desc:'女性用下着を着用されているお客様も含みます' },
+      { id:'外国人',   name:'外国人のお客様',       desc:'◎日本語話せなくてもOK　○日本語話せたらOK　×どちらもNG<br><small style="color:#c07000">※△は使用しません</small>' },
+    ]
+  },
+  {
+    label: '有料オプション',
+    items: [
+      { id:'キャスト射精',     name:'キャスト射精（有料）',     desc:'プレイ中にキャストさんが射精するオプション', paid:true },
+      { id:'無限射精',         name:'コース内キャスト2回以上射精（有料）', desc:'コース内でキャストさんが2回以上射精するオプションです', paid:true },
+      { id:'3P_お客2名',       name:'3P／お客様2名（有料）', desc:'お客様2名・キャスト1名でのプレイ', paid:true, is3p:'a' },
+      { id:'3P_キャスト2名',   name:'3P／キャスト2名（有料）', desc:'お客様1名・キャスト2名でのプレイ', paid:true, is3p:'b' },
+      { id:'コスプレ',         name:'コスプレ（有料）',          desc:'お店が用意したコスプレ衣装を着用してプレイします', paid:true },
+      { id:'ごっくん',         name:'ごっくん（有料）',          desc:'キャストさんがお客様の精液を飲み込むオプションです', paid:true },
+      { id:'聖水',             name:'聖水（有料）',              desc:'キャストさんが排尿するオプションです（シチュエーションに条件があれば備考欄へ）', paid:true },
+    ]
+  }
+];
+
+const VIBES = [
+  '天然・ふわふわ','しっかり者','甘えん坊','ギャル系',
+  '清楚・落ち着いてる','元気・明るい','ミステリアス','癒し系',
+  'サバサバ','積極的・攻め系','受け身・おとなしめ','ドS気質',
+  'ドM気質','甘々でエッチ','トーク上手','聞き上手',
+  '笑いが絶えない','色気たっぷり','純粋・うぶ','お姉さん系',
+];
+
+// 選択値保持
+let optVals = {}; // id -> '◎'|'○'|'△'|'×'|''
+let optMemo = {}; // id -> string
+
+// =========================================================
+//  初期化
+// =========================================================
+function init() {
+  buildOpts();
+  buildVibes();
+}
+
+// オプションリスト構築
+function buildOpts() {
+  const wrap = document.getElementById('opt-list');
+  OPT_SECTIONS.forEach(sec => {
+    const head = document.createElement('div');
+    head.className = 'opt-section-head';
+    head.textContent = '▸ ' + sec.label;
+    wrap.appendChild(head);
+
+    sec.items.forEach(item => {
+      optVals[item.id] = '';
+      optMemo[item.id] = '';
+
+      const div = document.createElement('div');
+      div.className = 'opt-item';
+      div.id = 'optitem-' + item.id;
+
+      const radioHtml = ['◎','○','△','×'].map(v => `
+        <input type="radio" class="opt-radio-hidden" name="opt-${item.id}" id="optr-${item.id}-${v}" value="${v}" onchange="optVals['${item.id}']=this.value">
+        <label class="opt-label-btn" for="optr-${item.id}-${v}">${v}</label>
+      `).join('');
+
+      div.innerHTML = `
+        <div class="opt-item-top">
+          <div class="opt-name-block">
+            <div class="opt-name">${item.name}</div>
+            ${item.desc ? `<div class="opt-desc">${item.desc}</div>` : ''}
+          </div>
+          <div class="opt-radio-group">${radioHtml}</div>
+        </div>
+        <input type="text" class="opt-memo" placeholder="備考　補足して伝えておきたい事があれば教えてください！"
+          oninput="optMemo['${item.id}']=this.value">
+      `;
+      wrap.appendChild(div);
+    });
+  });
+}
+
+// 雰囲気チップ
+function buildVibes() {
+  const g = document.getElementById('vibe-group');
+  VIBES.forEach(v => {
+    const btn = document.createElement('button');
+    btn.className = 'chip';
+    btn.textContent = v;
+    btn.type = 'button';
+    btn.onclick = () => btn.classList.toggle('selected');
+    g.appendChild(btn);
+  });
+}
+
+// オール◎
+function setAllMaru() {
+  OPT_SECTIONS.forEach(sec => sec.items.forEach(item => {
+    const radio = document.getElementById(`optr-${item.id}-◎`);
+    if (radio) { radio.checked = true; optVals[item.id] = '◎'; }
+  }));
+}
+
+// =========================================================
+//  ステップ移動
+// =========================================================
+function goStep(n) {
+  if (n === 5) buildPreview();
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  if (n === 'complete') {
+    document.getElementById('step-complete').classList.add('active');
+    document.getElementById('prog-fill').style.width = '100%';
+    document.getElementById('prog-pct').textContent = '100%';
+    document.getElementById('prog-label').textContent = '完了！';
+  } else {
+    document.getElementById('step-' + n).classList.add('active');
+    const total = 5;
+    const pct = Math.round(((n - 1) / total) * 100);
+    document.getElementById('prog-fill').style.width = pct + '%';
+    document.getElementById('prog-pct').textContent = pct + '%';
+    document.getElementById('prog-label').textContent = `STEP ${n} / ${total}`;
+  }
+  window.scrollTo(0, 0);
+}
+
+// =========================================================
+//  バリデーション
+// =========================================================
+function validateAndGo(next) {
+  const cur = next - 1;
+  let ok = true;
+
+  if (cur === 1) {
+    const req = [
+      { id:'f-name',        label:'源氏名' },
+      { id:'f-age',         label:'年齢' },
+      { id:'f-size',        label:'サイズ' },
+      { id:'f-psize',       label:'Pサイズ' },
+      { id:'f-personality', label:'性格' },
+      { id:'f-hobby',       label:'趣味' },
+      { id:'f-charm',       label:'チャームポイント' },
+      { id:'f-erogenous',   label:'性感帯' },
+      { id:'f-skill',       label:'得意技' },
+    ];
+    req.forEach(r => {
+      const el = document.getElementById(r.id);
+      if (!el.value.trim()) { el.classList.add('invalid'); ok = false; }
+      else el.classList.remove('invalid');
+    });
+    // ラジオ
+    const radios = [
+      { name:'state',  label:'状態（竿/玉）' },
+      { name:'hair',   label:'髪の毛' },
+      { name:'tabako', label:'タバコ' },
+    ];
+    radios.forEach(r => {
+      if (![...document.querySelectorAll(`input[name="${r.name}"]`)].some(el=>el.checked)) ok = false;
+    });
+    showErr('err-1', !ok);
+  }
+
+  if (cur === 2) {
+    // 全オプション選択済みか
+    const allSelected = OPT_SECTIONS.every(sec => sec.items.every(item => optVals[item.id]));
+    ok = allSelected;
+    showErr('err-2', !ok);
+  }
+
+  if (cur === 3) {
+    const comment = document.getElementById('f-comment').value.trim();
+    const vibeSelected = [...document.querySelectorAll('#vibe-group .chip.selected')].length > 0;
+    ok = comment && vibeSelected;
+    const ta = document.getElementById('f-comment');
+    ta.classList.toggle('invalid', !comment);
+    showErr('err-3', !ok);
+  }
+
+  if (ok) goStep(next);
+}
+
+function showErr(id, show) {
+  const el = document.getElementById(id);
+  if (show) {
+    el.classList.add('show');
+    el.style.animation = 'none';
+    requestAnimationFrame(() => { el.style.animation = 'shakeX .3s ease'; });
+  } else {
+    el.classList.remove('show');
+  }
+}
+
+// =========================================================
+//  文字カウント
+// =========================================================
+function countChar(el, id) {
+  document.getElementById(id).textContent = el.value.length;
+}
+
+// =========================================================
+//  プレビュー生成 (step5 表示時に呼ぶ)
+// =========================================================
+function buildPreview() {
+  const name        = document.getElementById('f-name').value || '（未入力）';
+  const age         = document.getElementById('f-age').value  || '（未入力）';
+  const size        = document.getElementById('f-size').value || '（未入力）';
+  const psize       = document.getElementById('f-psize').value|| '（未入力）';
+  const state       = [...document.querySelectorAll('input[name="state"]')].find(r=>r.checked)?.value || '（未選択）';
+  const hair        = [...document.querySelectorAll('input[name="hair"]')].find(r=>r.checked)?.value  || '（未選択）';
+  const personality = document.getElementById('f-personality').value || '（未入力）';
+  const hobby       = document.getElementById('f-hobby').value       || '（未入力）';
+  const charm       = document.getElementById('f-charm').value       || '（未入力）';
+  const tabako      = [...document.querySelectorAll('input[name="tabako"]')].find(r=>r.checked)?.value || '（未選択）';
+  const erogenous   = document.getElementById('f-erogenous').value   || '（未入力）';
+  const skill       = document.getElementById('f-skill').value       || '（未入力）';
+  const comment     = document.getElementById('f-comment').value     || '（未入力）';
+  const vibes       = [...document.querySelectorAll('#vibe-group .chip.selected')].map(b=>b.textContent).join('・') || '（未選択）';
+  const internal    = document.getElementById('f-internal').value    || '（なし）';
+
+  let optLines = '';
+  OPT_SECTIONS.forEach(sec => {
+    optLines += `\n▸ ${sec.label}\n`;
+    sec.items.forEach(item => {
+      const v = optVals[item.id] || '（未回答）';
+      const m = optMemo[item.id] ? `　備考：${optMemo[item.id]}` : '';
+      optLines += `  ${item.name}：${v}${m}\n`;
+    });
+  });
+
+  const text =
+`【基本情報】
+源氏名：${name}
+年齢：${age}歳
+サイズ：${size}
+Pサイズ：${psize}
+状態（竿/玉）：${state}
+髪の毛：${hair}
+性格：${personality}
+趣味：${hobby}
+チャームポイント：${charm}
+タバコ：${tabako}
+性感帯：${erogenous}
+得意技：${skill}
+
+【オプション可否】${optLines}
+【雰囲気】
+${vibes}
+
+【キャストからひとこと（素材）】
+${comment}
+
+【内勤への連絡事項】
+${internal}`;
+
+  document.getElementById('preview-content').textContent = text;
+}
+
+// =========================================================
+//  提出
+// =========================================================
+function submitForm() {
+  const name = document.getElementById('f-name').value || 'キャスト';
+
+  // フォームデータを収集してLocalStorageに保存
+  const tabako = [...document.querySelectorAll('input[name="tabako"]')].find(r=>r.checked)?.value || '';
+  const state  = [...document.querySelectorAll('input[name="state"]')].find(r=>r.checked)?.value  || '';
+  const hair   = [...document.querySelectorAll('input[name="hair"]')].find(r=>r.checked)?.value   || '';
+  const vibes  = [...document.querySelectorAll('#vibe-group .chip.selected')].map(b=>b.textContent);
+
+  // optVals/optMemoをname→valに変換（idからnameへ）
+  const optionsNamed = {};
+  const optMemoNamed = {};
+  OPT_SECTIONS.forEach(sec => {
+    sec.items.forEach(item => {
+      optionsNamed[item.name] = optVals[item.id] || '';
+      if (optMemo[item.id]) optMemoNamed[item.name] = optMemo[item.id];
+    });
+  });
+
+  const castData = {
+    id: Date.now(),
+    name,
+    age:         parseInt(document.getElementById('f-age').value)         || 0,
+    size:        document.getElementById('f-size').value,
+    psize:       document.getElementById('f-psize').value,
+    state,
+    hair,
+    personality: document.getElementById('f-personality').value,
+    hobby:       document.getElementById('f-hobby').value,
+    charm:       document.getElementById('f-charm').value,
+    tabako,
+    erogenous:   document.getElementById('f-erogenous').value,
+    skill:       document.getElementById('f-skill').value,
+    comment:     document.getElementById('f-comment').value,
+    vibes,
+    internal:    document.getElementById('f-internal').value,
+    options:     optionsNamed,
+    optMemo:     optMemoNamed,
+    status:      'new',
+    colorIdx:    Math.floor(Math.random() * 8),
+    submittedAt: new Date().toISOString()
+  };
+
+  // LocalStorageに保存
+  const existing = JSON.parse(localStorage.getItem('sakuraMoonCasts') || '[]');
+  existing.push(castData);
+  localStorage.setItem('sakuraMoonCasts', JSON.stringify(existing));
+
+  // Google Sheets送信（GAS URLが設定されていれば送信）
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbwC5lgUrJfd-PVvZQ2k7LS2SDbUO2V7g-3pOT_BLnyRM9RYQIlLKEEqUCE9vkRAmEADLQ/exec';
+  if (GAS_URL) {
+    sendToGAS(castData, GAS_URL);
+  }
+
+  document.getElementById('complete-name').textContent = `${name} さんのプロフ、受け取りました！`;
+  goStep('complete');
+}
+
+async function sendToGAS(data, url) {
+  try {
+    await fetch(url, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+  } catch(e) {
+    console.warn('GAS送信エラー:', e);
+  }
+}
+
+// 初期化
+init();
+</script>
+</body>
+</html>
