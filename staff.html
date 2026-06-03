@@ -1114,19 +1114,23 @@ function saveAllEdits() {
   renderSidebar();
   showToast('💾 すべての変更を保存しました！');
 
-  // GASにGETで確定データを送信（CORSを回避）
-  const params = new URLSearchParams({
-    action:       'updateConfirmed',
-    id:           String(cast.id),
-    name:         cast.name,
-    status:       cast.status,
-    castComment:  cast.generatedCastComment    || '',
-    mgrComment:   cast.generatedManagerComment || '',
-    comment:      cast.comment  || '',
-    internal:     cast.internal || ''
-  });
-  fetch(`${GAS_URL}?${params.toString()}`)
-    .catch(e => console.warn('GAS更新エラー:', e));
+  // GASにno-cors POSTで確定データを送信
+  fetch(GAS_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      _type:        'updateConfirmed',
+      _token:       generateGasToken(),
+      id:           String(cast.id),
+      name:         cast.name,
+      status:       cast.status,
+      castComment:  cast.generatedCastComment    || '',
+      mgrComment:   cast.generatedManagerComment || '',
+      comment:      cast.comment  || '',
+      internal:     cast.internal || ''
+    })
+  }).catch(e => console.warn('GAS更新エラー:', e));
 }
 
 function switchTab(tab) {
@@ -1684,6 +1688,18 @@ async function sendGeneratedToGAS(cast) {
 // =========================================================
 //  初期化：LocalStorageからフォーム提出データをマージ
 // =========================================================
+// GAS側のgenerateTokenと同じロジックでトークンを生成
+function generateGasToken() {
+  const today = new Date().toISOString().slice(0, 10);
+  const raw   = 'sakura2024' + today + 'sakuramoong_salt';
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) {
+    hash = ((hash << 5) - hash) + raw.charCodeAt(i);
+    hash |= 0;
+  }
+  return String(Math.abs(hash));
+}
+
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwC5lgUrJfd-PVvZQ2k7LS2SDbUO2V7g-3pOT_BLnyRM9RYQIlLKEEqUCE9vkRAmEADLQ/exec';
 
 async function manualReload() {
@@ -1701,7 +1717,6 @@ async function init() {
 async function loadFromGAS() {
   try {
     // 常に全件取得して削除済みを確実に除去する
-    const token = localStorage.getItem('sakuraMoon_authToken') || '';
     const res  = await fetch(`${GAS_URL}?action=getCasts`);
     const data = await res.json();
 
