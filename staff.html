@@ -510,60 +510,75 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 //  パスワード認証
 //  ★ パスワードを変更する場合はここを書き換えてください ★
 // =========================================================
-const STAFF_PASSWORD = '0210'; // ← ここを変更
-const SESSION_HOURS  = 24;            // セッション有効時間（時間）
+// ============================================================
+//  認証 - パスワードはGAS側で管理（HTMLには書かない）
+// ============================================================
+const SESSION_HOURS = 24;
 
-// パスワードの簡易ハッシュ（PW変更時にセッションを自動無効化するため）
-function simpleHash(str) {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash) + str.charCodeAt(i);
-    hash |= 0;
+async function checkAuth() {
+  const inp = document.getElementById('auth-input');
+  const pw  = inp.value;
+  if (!pw) return;
+
+  const btn = document.querySelector('#auth-screen button');
+  btn.textContent = '確認中…';
+  btn.disabled    = true;
+
+  try {
+    const res  = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ _type: 'login', password: pw })
+    });
+    const data = await res.json();
+
+    if (data.result === 'ok' && data.token) {
+      const expiry = Date.now() + SESSION_HOURS * 60 * 60 * 1000;
+      localStorage.setItem('sakuraMoon_authExpiry', expiry);
+      localStorage.setItem('sakuraMoon_authToken',  data.token);
+      document.getElementById('auth-screen').style.display = 'none';
+      document.getElementById('main-app').style.display    = 'flex';
+      init();
+    } else {
+      showAuthError();
+    }
+  } catch(e) {
+    showAuthError('通信エラーが発生しました');
   }
-  return String(hash);
+
+  btn.textContent = 'ログイン';
+  btn.disabled    = false;
 }
 
-function checkAuth() {
-  const input = document.getElementById('auth-input').value;
-  if (input === STAFF_PASSWORD) {
-    const expiry = Date.now() + SESSION_HOURS * 60 * 60 * 1000;
-    localStorage.setItem('sakuraMoon_authExpiry', expiry);
-    localStorage.setItem('sakuraMoon_authHash', simpleHash(STAFF_PASSWORD));
-    document.getElementById('auth-screen').style.display = 'none';
-    document.getElementById('main-app').style.display    = 'flex';
-    init();
-  } else {
-    const errEl = document.getElementById('auth-error');
-    errEl.style.display = 'block';
-    const inp = document.getElementById('auth-input');
-    inp.value = '';
-    inp.style.borderColor = '#FF5A7A';
-    setTimeout(() => { inp.style.borderColor = '#F0C8D5'; }, 1500);
-  }
+function showAuthError(msg) {
+  const errEl = document.getElementById('auth-error');
+  errEl.textContent = '❌ ' + (msg || 'パスワードが違います');
+  errEl.style.display = 'block';
+  const inp = document.getElementById('auth-input');
+  inp.value = '';
+  inp.style.borderColor = '#FF5A7A';
+  setTimeout(() => { inp.style.borderColor = '#F0C8D5'; errEl.style.display = 'none'; }, 2000);
 }
 
 function logout() {
   localStorage.removeItem('sakuraMoon_authExpiry');
-  localStorage.removeItem('sakuraMoon_authHash');
+  localStorage.removeItem('sakuraMoon_authToken');
   location.reload();
 }
 
 // 起動時に認証チェック
 (function() {
-  const expiry      = parseInt(localStorage.getItem('sakuraMoon_authExpiry') || '0');
-  const savedHash   = localStorage.getItem('sakuraMoon_authHash') || '';
-  const currentHash = simpleHash(STAFF_PASSWORD);
-  const sessionValid = Date.now() < expiry && savedHash === currentHash;
+  const expiry = parseInt(localStorage.getItem('sakuraMoon_authExpiry') || '0');
+  const token  = localStorage.getItem('sakuraMoon_authToken') || '';
+  const sessionValid = Date.now() < expiry && token !== '';
 
   if (sessionValid) {
-    // セッション有効 かつ PW変更なし → そのまま表示
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('main-app').style.display    = 'flex';
     document.addEventListener('DOMContentLoaded', () => init());
   } else {
-    // セッション切れ or PW変更済み → 強制ログアウト・認証画面へ
     localStorage.removeItem('sakuraMoon_authExpiry');
-    localStorage.removeItem('sakuraMoon_authHash');
+    localStorage.removeItem('sakuraMoon_authToken');
     document.getElementById('auth-screen').style.display = 'flex';
     document.getElementById('main-app').style.display    = 'none';
     document.addEventListener('DOMContentLoaded', () => {
@@ -1465,7 +1480,7 @@ function deleteCast(id) {
     method: 'POST',
     mode: 'no-cors',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ _type: 'delete', id: cast.id, name: cast.name })
+    body: JSON.stringify({ _type: 'delete', id: cast.id, name: cast.name, _token: localStorage.getItem('sakuraMoon_authToken')||'' })
   }).catch(e => console.warn('GAS削除エラー:', e));
 
   // ローカルからも削除
@@ -1670,7 +1685,8 @@ async function init() {
 async function loadFromGAS() {
   try {
     // 常に全件取得して削除済みを確実に除去する
-    const res  = await fetch(`${GAS_URL}?action=getCasts`);
+    const token = localStorage.getItem('sakuraMoon_authToken') || '';
+    const res  = await fetch(`${GAS_URL}?action=getCasts&token=${encodeURIComponent(token)}`);
     const data = await res.json();
 
     if (data.result === 'ok') {
@@ -1683,14 +1699,21 @@ async function loadFromGAS() {
       // 新規・更新をマージ
       let newCount = 0;
       gasCasts.forEach(c => {
-        c.status   = c.status   || 'new';
         c.colorIdx = c.colorIdx != null ? c.colorIdx : (casts.length % 8);
         const idx  = casts.findIndex(x =>
           String(x.id) === String(c.id) || x.name === c.name
         );
         if (idx >= 0) {
+          // ローカルで確定・編集済みのステータスと生成済みコメントは上書きしない
+          const keepStatus   = casts[idx].status;
+          const keepCastCom  = casts[idx].generatedCastComment;
+          const keepMgrCom   = casts[idx].generatedManagerComment;
           casts[idx] = { ...casts[idx], ...c };
+          casts[idx].status                  = keepStatus || 'new';
+          casts[idx].generatedCastComment    = keepCastCom  || c.generatedCastComment;
+          casts[idx].generatedManagerComment = keepMgrCom   || c.generatedManagerComment;
         } else {
+          c.status = c.status || 'new';
           casts.push(c);
           newCount++;
         }
