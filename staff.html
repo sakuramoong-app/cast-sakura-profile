@@ -360,6 +360,9 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
       <div id="cast-list-wrap"></div>
     </div>
     <button class="add-cast-btn" onclick="openModal()">＋ キャストを手動追加</button>
+    <button class="add-cast-btn" onclick="manualReload()" style="border-color:#7DD8B0;color:#1a6640">
+      🔄 最新データに更新
+    </button>
   </aside>
 
   <!-- ====== MAIN ====== -->
@@ -537,8 +540,8 @@ async function checkAuth() {
   const hash = await hashPassword(pw);
   if (hash === STAFF_PW_HASH) {
     const expiry = Date.now() + SESSION_HOURS * 60 * 60 * 1000;
-    localStorage.setItem('sakuraMoon_authExpiry', expiry);
-    localStorage.setItem('sakuraMoon_authHash',   hash);
+    sessionStorage.setItem('sakuraMoon_authExpiry', expiry);
+    sessionStorage.setItem('sakuraMoon_authHash',   hash);
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('main-app').style.display    = 'flex';
     init();
@@ -553,15 +556,15 @@ async function checkAuth() {
 }
 
 function logout() {
-  localStorage.removeItem('sakuraMoon_authExpiry');
-  localStorage.removeItem('sakuraMoon_authHash');
+  sessionStorage.removeItem('sakuraMoon_authExpiry');
+  sessionStorage.removeItem('sakuraMoon_authHash');
   location.reload();
 }
 
 // 起動時に認証チェック（PW変更時は自動ログアウト）
 (function() {
-  const expiry    = parseInt(localStorage.getItem('sakuraMoon_authExpiry') || '0');
-  const savedHash = localStorage.getItem('sakuraMoon_authHash') || '';
+  const expiry    = parseInt(sessionStorage.getItem('sakuraMoon_authExpiry') || '0');
+  const savedHash = sessionStorage.getItem('sakuraMoon_authHash') || '';
   const sessionValid = Date.now() < expiry && savedHash === STAFF_PW_HASH;
 
   if (sessionValid) {
@@ -569,8 +572,8 @@ function logout() {
     document.getElementById('main-app').style.display    = 'flex';
     document.addEventListener('DOMContentLoaded', () => init());
   } else {
-    localStorage.removeItem('sakuraMoon_authExpiry');
-    localStorage.removeItem('sakuraMoon_authHash');
+    sessionStorage.removeItem('sakuraMoon_authExpiry');
+    sessionStorage.removeItem('sakuraMoon_authHash');
     document.getElementById('auth-screen').style.display = 'flex';
     document.getElementById('main-app').style.display    = 'none';
     document.addEventListener('DOMContentLoaded', () => {
@@ -1111,24 +1114,19 @@ function saveAllEdits() {
   renderSidebar();
   showToast('💾 すべての変更を保存しました！');
 
-  // GASに確定データを送信（別ブラウザにも反映）
-  const token = localStorage.getItem('sakuraMoon_authToken') || '';
-  fetch(GAS_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      _type:  'updateConfirmed',
-      _token: token,
-      id:     cast.id,
-      name:   cast.name,
-      status: cast.status,
-      generatedCastComment:    cast.generatedCastComment    || '',
-      generatedManagerComment: cast.generatedManagerComment || '',
-      comment:  cast.comment  || '',
-      internal: cast.internal || ''
-    })
-  }).catch(e => console.warn('GAS更新エラー:', e));
+  // GASにGETで確定データを送信（CORSを回避）
+  const params = new URLSearchParams({
+    action:       'updateConfirmed',
+    id:           String(cast.id),
+    name:         cast.name,
+    status:       cast.status,
+    castComment:  cast.generatedCastComment    || '',
+    mgrComment:   cast.generatedManagerComment || '',
+    comment:      cast.comment  || '',
+    internal:     cast.internal || ''
+  });
+  fetch(`${GAS_URL}?${params.toString()}`)
+    .catch(e => console.warn('GAS更新エラー:', e));
 }
 
 function switchTab(tab) {
@@ -1687,6 +1685,13 @@ async function sendGeneratedToGAS(cast) {
 //  初期化：LocalStorageからフォーム提出データをマージ
 // =========================================================
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwC5lgUrJfd-PVvZQ2k7LS2SDbUO2V7g-3pOT_BLnyRM9RYQIlLKEEqUCE9vkRAmEADLQ/exec';
+
+async function manualReload() {
+  showToast('🔄 最新データを取得中...');
+  // キャッシュをクリアして全件再取得
+  localStorage.removeItem('sakuraMoon_lastSync');
+  await loadFromGAS();
+}
 
 async function init() {
   renderSidebar(); // キャッシュから即表示
