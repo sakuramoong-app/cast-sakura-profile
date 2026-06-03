@@ -511,66 +511,58 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 //  ★ パスワードを変更する場合はここを書き換えてください ★
 // =========================================================
 // ============================================================
-//  認証 - パスワードはGAS側で管理（HTMLには書かない）
+//  認証 - パスワードのハッシュのみHTMLに保持（平文は書かない）
+//  パスワード変更時は STAFF_PW_HASH を更新してください
 // ============================================================
 const SESSION_HOURS = 24;
+
+// ★ パスワードを変更したらこのハッシュ値も更新が必要です
+// ハッシュの計算方法: ブラウザのコンソールで hashPassword('新しいパスワード') を実行
+// 現在のパスワード: sakura2024
+const STAFF_PW_HASH = '08937320';
+
+async function hashPassword(pw) {
+  const encoder = new TextEncoder();
+  const data    = encoder.encode(pw + 'sakuramoong_salt_2024');
+  const hashBuf = await crypto.subtle.digest('SHA-256', data);
+  const hashArr = Array.from(new Uint8Array(hashBuf));
+  return hashArr.map(b => b.toString(16).padStart(2,'0')).join('').slice(0, 8);
+}
 
 async function checkAuth() {
   const inp = document.getElementById('auth-input');
   const pw  = inp.value;
   if (!pw) return;
 
-  const btn = document.querySelector('#auth-screen button');
-  btn.textContent = '確認中…';
-  btn.disabled    = true;
-
-  try {
-    const res  = await fetch(GAS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ _type: 'login', password: pw })
-    });
-    const data = await res.json();
-
-    if (data.result === 'ok' && data.token) {
-      const expiry = Date.now() + SESSION_HOURS * 60 * 60 * 1000;
-      localStorage.setItem('sakuraMoon_authExpiry', expiry);
-      localStorage.setItem('sakuraMoon_authToken',  data.token);
-      document.getElementById('auth-screen').style.display = 'none';
-      document.getElementById('main-app').style.display    = 'flex';
-      init();
-    } else {
-      showAuthError();
-    }
-  } catch(e) {
-    showAuthError('通信エラーが発生しました');
+  const hash = await hashPassword(pw);
+  if (hash === STAFF_PW_HASH) {
+    const expiry = Date.now() + SESSION_HOURS * 60 * 60 * 1000;
+    localStorage.setItem('sakuraMoon_authExpiry', expiry);
+    localStorage.setItem('sakuraMoon_authHash',   hash);
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('main-app').style.display    = 'flex';
+    init();
+  } else {
+    const errEl = document.getElementById('auth-error');
+    errEl.textContent = '❌ パスワードが違います';
+    errEl.style.display = 'block';
+    inp.value = '';
+    inp.style.borderColor = '#FF5A7A';
+    setTimeout(() => { inp.style.borderColor = '#F0C8D5'; errEl.style.display = 'none'; }, 2000);
   }
-
-  btn.textContent = 'ログイン';
-  btn.disabled    = false;
-}
-
-function showAuthError(msg) {
-  const errEl = document.getElementById('auth-error');
-  errEl.textContent = '❌ ' + (msg || 'パスワードが違います');
-  errEl.style.display = 'block';
-  const inp = document.getElementById('auth-input');
-  inp.value = '';
-  inp.style.borderColor = '#FF5A7A';
-  setTimeout(() => { inp.style.borderColor = '#F0C8D5'; errEl.style.display = 'none'; }, 2000);
 }
 
 function logout() {
   localStorage.removeItem('sakuraMoon_authExpiry');
-  localStorage.removeItem('sakuraMoon_authToken');
+  localStorage.removeItem('sakuraMoon_authHash');
   location.reload();
 }
 
-// 起動時に認証チェック
+// 起動時に認証チェック（PW変更時は自動ログアウト）
 (function() {
-  const expiry = parseInt(localStorage.getItem('sakuraMoon_authExpiry') || '0');
-  const token  = localStorage.getItem('sakuraMoon_authToken') || '';
-  const sessionValid = Date.now() < expiry && token !== '';
+  const expiry    = parseInt(localStorage.getItem('sakuraMoon_authExpiry') || '0');
+  const savedHash = localStorage.getItem('sakuraMoon_authHash') || '';
+  const sessionValid = Date.now() < expiry && savedHash === STAFF_PW_HASH;
 
   if (sessionValid) {
     document.getElementById('auth-screen').style.display = 'none';
@@ -578,7 +570,7 @@ function logout() {
     document.addEventListener('DOMContentLoaded', () => init());
   } else {
     localStorage.removeItem('sakuraMoon_authExpiry');
-    localStorage.removeItem('sakuraMoon_authToken');
+    localStorage.removeItem('sakuraMoon_authHash');
     document.getElementById('auth-screen').style.display = 'flex';
     document.getElementById('main-app').style.display    = 'none';
     document.addEventListener('DOMContentLoaded', () => {
