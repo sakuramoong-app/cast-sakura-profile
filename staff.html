@@ -1079,6 +1079,14 @@ function saveAllEdits() {
       if (!cast.options) cast.options = {};
       cast.options[key] = r.value;
     });
+    // 備考も保存
+    document.querySelectorAll('#opt-edit-mode input[type=text]').forEach(inp => {
+      const key = inp.getAttribute('onchange')?.match(/updateOptMemo\('(.+?)'/)?.[1];
+      if (key) {
+        if (!cast.optMemo) cast.optMemo = {};
+        cast.optMemo[key] = inp.value;
+      }
+    });
   }
 
   // 3つのテキストフィールドを全て確定に
@@ -1128,7 +1136,9 @@ function saveAllEdits() {
       castComment:  cast.generatedCastComment    || '',
       mgrComment:   cast.generatedManagerComment || '',
       comment:      cast.comment  || '',
-      internal:     cast.internal || ''
+      internal:     cast.internal || '',
+      options:      cast.options  || {},
+      optMemo:      cast.optMemo  || {}
     })
   }).catch(e => console.warn('GAS更新エラー:', e));
 }
