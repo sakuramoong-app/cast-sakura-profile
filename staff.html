@@ -903,6 +903,108 @@ function renderAnswerTab(cast) {
     </div>
     ` : ''}
 
+    <div class="panel" id="panel-back">
+      <div class="panel-header">
+        <div class="panel-title">💴 バック設定</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span id="badge-back" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:var(--yellow-soft);color:#9a7000">${(cast.backData && Object.keys(cast.backData).length > 0) ? '設定済' : '未設定'}</span>
+        </div>
+      </div>
+      <div class="panel-body">
+        <!-- コースタブ -->
+        <div style="display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap">
+          ${['サクラナ','CC','極門','イベ'].map((c,i) => `
+            <button onclick="switchBackTab('${c}')" id="backtab-${c}" style="
+              padding:7px 14px;border-radius:10px;font-size:13px;font-weight:700;
+              border:1.5px solid var(--border);cursor:pointer;font-family:inherit;
+              background:${i===0?'var(--pink)':'var(--white)'};
+              color:${i===0?'#fff':'var(--text2)'};
+              transition:all .2s;
+            ">${c}</button>
+          `).join('')}
+        </div>
+
+        <!-- サクラナ -->
+        <div id="backcontent-サクラナ">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:10px">60分〜1440分（30分刻み）のバック額を入力してください（円）</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            ${Array.from({length:47},(_,i)=>60+i*30).map(min=>`
+              <div style="background:var(--pink-bg);border-radius:8px;padding:8px">
+                <div style="font-size:11px;color:var(--text2);margin-bottom:4px">${min}分</div>
+                <input type="number" class="back-input" data-course="サクラナ" data-min="${min}"
+                  value="${cast.backData?.['サクラナ']?.[min]||''}"
+                  placeholder="0" min="0" step="100"
+                  style="width:100%;background:#fff;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;color:var(--text);font-family:inherit;outline:none"
+                  oninput="updateBackData('サクラナ',${min},this.value)">
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- CC -->
+        <div id="backcontent-CC" style="display:none">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:10px">各コース時間のバック額を入力してください（円）</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            ${[80,100,120,150,180].map(min=>`
+              <div style="background:var(--pink-bg);border-radius:8px;padding:8px">
+                <div style="font-size:11px;color:var(--text2);margin-bottom:4px">${min}分</div>
+                <input type="number" class="back-input" data-course="CC" data-min="${min}"
+                  value="${cast.backData?.['CC']?.[min]||''}"
+                  placeholder="0" min="0" step="100"
+                  style="width:100%;background:#fff;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;color:var(--text);font-family:inherit;outline:none"
+                  oninput="updateBackData('CC',${min},this.value)">
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- 極門 -->
+        <div id="backcontent-極門" style="display:none">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:10px">コース別にバック額を入力してください（円）</div>
+          ${[
+            {name:'入門',mins:[80,100,120,150]},
+            {name:'悶絶',mins:[80,100,120,150]},
+            {name:'男の潮吹き',mins:[80,100,120,150]},
+            {name:'極',mins:[100,120,150,180]},
+            {name:'ヘルス',mins:[60,90,120,150]},
+          ].map(sub=>`
+            <div style="margin-bottom:16px">
+              <div style="font-size:12px;font-weight:700;color:var(--pink);margin-bottom:8px">▸ ${sub.name}</div>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+                ${sub.mins.map(min=>`
+                  <div style="background:var(--pink-bg);border-radius:8px;padding:8px">
+                    <div style="font-size:11px;color:var(--text2);margin-bottom:4px">${min}分</div>
+                    <input type="number" class="back-input" data-course="極門_${sub.name}" data-min="${min}"
+                      value="${cast.backData?.['極門_'+sub.name]?.[min]||''}"
+                      placeholder="0" min="0" step="100"
+                      style="width:100%;background:#fff;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;color:var(--text);font-family:inherit;outline:none"
+                      oninput="updateBackData('極門_${sub.name}',${min},this.value)">
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <!-- イベ -->
+        <div id="backcontent-イベ" style="display:none">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:10px">各コース時間のバック額を入力してください（円）</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            ${[60,90,120].map(min=>`
+              <div style="background:var(--pink-bg);border-radius:8px;padding:8px">
+                <div style="font-size:11px;color:var(--text2);margin-bottom:4px">${min}分</div>
+                <input type="number" class="back-input" data-course="イベ" data-min="${min}"
+                  value="${cast.backData?.['イベ']?.[min]||''}"
+                  placeholder="0" min="0" step="100"
+                  style="width:100%;background:#fff;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;color:var(--text);font-family:inherit;outline:none"
+                  oninput="updateBackData('イベ',${min},this.value)">
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div style="position:sticky;bottom:16px;padding:0 0 8px">
       <button onclick="saveAllEdits()" style="
         width:100%;background:linear-gradient(135deg,#7DD8B0,#4CC494);
@@ -1122,6 +1224,17 @@ function saveAllEdits() {
   renderSidebar();
   showToast('💾 すべての変更を保存しました！');
 
+  // バックデータはupdateBackDataでリアルタイム更新済み → キャッシュ保存で完了
+  // バッジ更新
+  const backBadge = document.getElementById('badge-back');
+  if (backBadge) {
+    const cast2 = casts.find(c => c.id === currentCastId);
+    const hasBack = cast2?.backData && Object.keys(cast2.backData).some(k => Object.keys(cast2.backData[k]).length > 0);
+    backBadge.textContent      = hasBack ? '設定済' : '未設定';
+    backBadge.style.background = hasBack ? 'var(--mint-soft)' : 'var(--yellow-soft)';
+    backBadge.style.color      = hasBack ? '#1a6640' : '#9a7000';
+  }
+
   // GASにno-cors POSTで確定データを送信
   fetch(GAS_URL, {
     method: 'POST',
@@ -1147,6 +1260,34 @@ function switchTab(tab) {
   currentTab = tab;
   const cast = casts.find(c => c.id === currentCastId);
   renderAnswerTab(cast);
+}
+
+// =========================================================
+//  バック管理
+// =========================================================
+function switchBackTab(course) {
+  ['サクラナ','CC','極門','イベ'].forEach(c => {
+    const content = document.getElementById('backcontent-' + c);
+    const tab     = document.getElementById('backtab-' + c);
+    if (content) content.style.display = c === course ? 'block' : 'none';
+    if (tab) {
+      tab.style.background = c === course ? 'var(--pink)' : 'var(--white)';
+      tab.style.color      = c === course ? '#fff' : 'var(--text2)';
+    }
+  });
+}
+
+function updateBackData(course, min, val) {
+  const cast = casts.find(c => c.id === currentCastId);
+  if (!cast) return;
+  if (!cast.backData) cast.backData = {};
+  if (!cast.backData[course]) cast.backData[course] = {};
+  const num = parseInt(val);
+  if (!isNaN(num) && num > 0) {
+    cast.backData[course][min] = num;
+  } else {
+    delete cast.backData[course][min];
+  }
 }
 
 // =========================================================
