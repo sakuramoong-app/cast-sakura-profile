@@ -1678,7 +1678,7 @@ async function loadFromGAS() {
   try {
     // 常に全件取得して削除済みを確実に除去する
     const token = localStorage.getItem('sakuraMoon_authToken') || '';
-    const res  = await fetch(`${GAS_URL}?action=getCasts&token=${encodeURIComponent(token)}`);
+    const res  = await fetch(`${GAS_URL}?action=getCasts`);
     const data = await res.json();
 
     if (data.result === 'ok') {
