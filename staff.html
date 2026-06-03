@@ -1110,6 +1110,25 @@ function saveAllEdits() {
   saveCastsCache();
   renderSidebar();
   showToast('💾 すべての変更を保存しました！');
+
+  // GASに確定データを送信（別ブラウザにも反映）
+  const token = localStorage.getItem('sakuraMoon_authToken') || '';
+  fetch(GAS_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      _type:  'updateConfirmed',
+      _token: token,
+      id:     cast.id,
+      name:   cast.name,
+      status: cast.status,
+      generatedCastComment:    cast.generatedCastComment    || '',
+      generatedManagerComment: cast.generatedManagerComment || '',
+      comment:  cast.comment  || '',
+      internal: cast.internal || ''
+    })
+  }).catch(e => console.warn('GAS更新エラー:', e));
 }
 
 function switchTab(tab) {
@@ -1696,14 +1715,14 @@ async function loadFromGAS() {
           String(x.id) === String(c.id) || x.name === c.name
         );
         if (idx >= 0) {
-          // ローカルで確定・編集済みのステータスと生成済みコメントは上書きしない
-          const keepStatus   = casts[idx].status;
-          const keepCastCom  = casts[idx].generatedCastComment;
-          const keepMgrCom   = casts[idx].generatedManagerComment;
+          // ローカルの確定データを優先、なければGASの確定データを使う
+          const keepStatus   = casts[idx].status !== 'new' ? casts[idx].status : (c.status || 'new');
+          const keepCastCom  = casts[idx].generatedCastComment    || c.generatedCastComment    || '';
+          const keepMgrCom   = casts[idx].generatedManagerComment || c.generatedManagerComment || '';
           casts[idx] = { ...casts[idx], ...c };
-          casts[idx].status                  = keepStatus || 'new';
-          casts[idx].generatedCastComment    = keepCastCom  || c.generatedCastComment;
-          casts[idx].generatedManagerComment = keepMgrCom   || c.generatedManagerComment;
+          casts[idx].status                  = keepStatus;
+          casts[idx].generatedCastComment    = keepCastCom;
+          casts[idx].generatedManagerComment = keepMgrCom;
         } else {
           c.status = c.status || 'new';
           casts.push(c);
