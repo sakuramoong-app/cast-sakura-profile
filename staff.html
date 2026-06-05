@@ -953,21 +953,13 @@ function renderAnswerTab(cast) {
 
         <!-- サクラナ -->
         <div id="backcontent-サクラナ">
-          <div style="font-size:12px;font-weight:700;color:var(--pink);margin-bottom:10px">▸ 通常コース</div>
+          <div style="font-size:12px;font-weight:700;color:var(--pink);margin-bottom:10px">▸ 通常コース（60〜1440分・30分刻み）</div>
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
-            ${[
-              {key:'60',label:'60分'},
-              {key:'90',label:'90分'},
-              {key:'120',label:'120分'},
-              {key:'150',label:'150分'},
-              {key:'180',label:'180分'},
-              {key:'210',label:'210分'},
-              {key:'240',label:'240分'},
-              {key:'300',label:'300分'},
-              {key:'360',label:'360分'},
-              {key:'720',label:'720分'},
-              {key:'720特',label:'720分（特）'},
-            ].map(({key,label})=>`
+            ${Array.from({length:47},(_,i)=>{
+              const min = 60 + i*30;
+              const specialLabel = min === 720 ? '720分' : min === 720 ? '' : null;
+              return {key:String(min), label:min+'分'};
+            }).concat([{key:'720特',label:'720分（特）'}]).map(({key,label})=>`
               <div style="background:var(--pink-bg);border-radius:8px;padding:8px">
                 <div style="font-size:11px;color:var(--text2);margin-bottom:4px">${label}</div>
                 <input type="number" class="back-input" data-course="サクラナ" data-min="${key}"
@@ -1403,7 +1395,7 @@ function applyBackPreset() {
   if (!cast) return;
   if (!cast.backData) cast.backData = {};
 
-  // プリセットを適用
+  // プリセットを適用（プリセットにあるコース・項目だけ上書き、ないものはそのまま）
   Object.entries(preset).forEach(([course, vals]) => {
     if (!cast.backData[course]) cast.backData[course] = {};
     Object.entries(vals).forEach(([key, val]) => {
@@ -1411,19 +1403,24 @@ function applyBackPreset() {
     });
   });
 
-  // 画面の入力欄を更新
-  document.querySelectorAll('.back-input').forEach(inp => {
-    const course = inp.dataset.course;
-    const min    = inp.dataset.min;
-    if (cast.backData[course]?.[min] !== undefined) {
-      inp.value = cast.backData[course][min];
-    }
+  // 全タブ（非表示含む）の入力欄を更新
+  // display:noneでもdata属性でアクセスできるので直接更新
+  ['サクラナ','CC','極門','イベ','オプション'].forEach(course => {
+    const container = document.getElementById('backcontent-' + course);
+    if (!container) return;
+    container.querySelectorAll('.back-input').forEach(inp => {
+      const c   = inp.dataset.course;
+      const key = inp.dataset.min;
+      if (cast.backData[c]?.[key] !== undefined) {
+        inp.value = cast.backData[c][key];
+      }
+      // プリセットにない項目は既存の値を維持（空欄はそのまま）
+    });
   });
 
   saveCastsCache();
   showToast(`✅ ${rank}ランクのプリセットを適用しました！`);
 
-  // バッジ更新
   const badge = document.getElementById('badge-back');
   if (badge) { badge.textContent = '設定済'; badge.style.background = 'var(--mint-soft)'; badge.style.color = '#1a6640'; }
 }
