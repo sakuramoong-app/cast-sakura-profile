@@ -907,7 +907,7 @@ function submitForm() {
   localStorage.setItem('sakuraMoonCasts', JSON.stringify(existing));
 
   // Google Sheets送信（GAS URLが設定されていれば送信）
-  const GAS_URL = 'https://script.google.com/macros/s/AKfycbwC5lgUrJfd-PVvZQ2k7LS2SDbUO2V7g-3pOT_BLnyRM9RYQIlLKEEqUCE9vkRAmEADLQ/exec';
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbzi57Ov9kuxR9dP4nHk3nMg3usGF4XCPqYmt_sJ8CrXAFbD6vUSVIP7PUsRSgOwFsP_/exec';
   if (GAS_URL) {
     sendToGAS(castData, GAS_URL);
   }
