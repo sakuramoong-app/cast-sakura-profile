@@ -918,11 +918,13 @@ function submitForm() {
 
 async function sendToGAS(data, url) {
   try {
+    // FormDataで送信（no-corsでも確実に届く方式）
+    const form = new FormData();
+    form.append('payload', JSON.stringify(data));
     await fetch(url, {
       method: 'POST',
       mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+      body: form
     });
   } catch(e) {
     console.warn('GAS送信エラー:', e);
