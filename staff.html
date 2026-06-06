@@ -521,7 +521,6 @@ const SESSION_HOURS = 24;
 
 // ★ パスワードを変更したらこのハッシュ値も更新が必要です
 // ハッシュの計算方法: ブラウザのコンソールで hashPassword('新しいパスワード') を実行
-// 現在のパスワード: sakura2024
 const STAFF_PW_HASH = '08937320';
 
 async function hashPassword(pw) {
@@ -583,6 +582,19 @@ function logout() {
 })();
 
 // =========================================================
+//  XSSエスケープ
+// =========================================================
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// =========================================================
 //  オプション定義
 // =========================================================
 const OPT_ALL = [
@@ -636,8 +648,8 @@ function renderSidebar(filter) {
     div.innerHTML = `
       <div class="cast-avatar" style="background:${AVATAR_COLORS[c.colorIdx % AVATAR_COLORS.length]}">${c.name[0]}</div>
       <div class="cast-info">
-        <div class="cast-name">${c.name}</div>
-        <div class="cast-meta">${c.age}歳 / ${c.size ? c.size.split('-')[0] : '—'}</div>
+        <div class="cast-name">${esc(c.name)}</div>
+        <div class="cast-meta">${esc(String(c.age))}歳 / ${esc(c.size ? c.size.split('-')[0] : '—')}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
         <div class="cast-status ${statusClass}">${statusLabel}</div>
@@ -1291,7 +1303,7 @@ function saveAllEdits() {
     if (field === 'internal') cast.internal                = val;
 
     // 表示モードに戻す
-    viewEl.innerHTML      = val || '<span style="color:var(--text2)">未入力</span>';
+    viewEl.innerHTML      = val ? esc(val) : '<span style="color:var(--text2)">未入力</span>';
     viewEl.style.display  = 'block';
     editEl.style.display  = 'none';
     if (btnEl) { btnEl.textContent = '✏️ 編集する'; btnEl.style.background = 'var(--pink-soft)'; btnEl.style.color = 'var(--pink)'; }
@@ -1322,24 +1334,25 @@ function saveAllEdits() {
     backBadge.style.color      = hasBack ? '#1a6640' : '#9a7000';
   }
 
-  // GASにno-cors POSTで確定データを送信
+  // GASにno-cors POSTで確定データを送信（FormData方式）
+  const confForm = new FormData();
+  confForm.append('payload', JSON.stringify({
+    _type:        'updateConfirmed',
+    _token:       generateGasToken(),
+    id:           String(cast.id),
+    name:         cast.name,
+    status:       cast.status,
+    castComment:  cast.generatedCastComment    || '',
+    mgrComment:   cast.generatedManagerComment || '',
+    comment:      cast.comment  || '',
+    internal:     cast.internal || '',
+    options:      cast.options  || {},
+    optMemo:      cast.optMemo  || {}
+  }));
   fetch(GAS_URL, {
     method: 'POST',
     mode: 'no-cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      _type:        'updateConfirmed',
-      _token:       generateGasToken(),
-      id:           String(cast.id),
-      name:         cast.name,
-      status:       cast.status,
-      castComment:  cast.generatedCastComment    || '',
-      mgrComment:   cast.generatedManagerComment || '',
-      comment:      cast.comment  || '',
-      internal:     cast.internal || '',
-      options:      cast.options  || {},
-      optMemo:      cast.optMemo  || {}
-    })
+    body: confForm
   }).catch(e => console.warn('GAS更新エラー:', e));
 }
 
@@ -1785,14 +1798,20 @@ function showToast(msg) {
 function deleteCast(id) {
   const cast = casts.find(c => String(c.id) === String(id));
   if (!cast) return;
-  if (!confirm(`「${cast.name}」を削除しますか？\n（全てのPCで削除されます）`)) return;
+  if (!confirm(`「${esc(cast.name)}」を削除しますか？\n（全てのPCで削除されます）`)) return;
 
-  // GASに削除フラグをPOST
+  // GASに削除フラグをFormDataでPOST
+  const delForm = new FormData();
+  delForm.append('payload', JSON.stringify({
+    _type: 'delete',
+    id: cast.id,
+    name: cast.name,
+    _token: generateGasToken()
+  }));
   fetch(GAS_URL, {
     method: 'POST',
     mode: 'no-cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ _type: 'delete', id: cast.id, name: cast.name, _token: localStorage.getItem('sakuraMoon_authToken')||'' })
+    body: delForm
   }).catch(e => console.warn('GAS削除エラー:', e));
 
   // ローカルからも削除
@@ -1934,7 +1953,7 @@ function openGasModal() {
   document.getElementById('gas-url-input').value = saved;
   const msg = document.getElementById('gas-status-msg');
   if (saved) {
-    msg.innerHTML = '✅ 現在のURL：<br><small style="word-break:break-all">' + saved + '</small>';
+    msg.innerHTML = '✅ 現在のURL：<br><small style="word-break:break-all">' + esc(saved) + '</small>';
     msg.style.display = 'block';
   } else {
     msg.innerHTML = '未設定です。上の手順でGASをデプロイしてURLを貼り付けてください。';
@@ -1990,7 +2009,7 @@ async function sendGeneratedToGAS(cast) {
 // GAS側のgenerateTokenと同じロジックでトークンを生成
 function generateGasToken() {
   const today = new Date().toISOString().slice(0, 10);
-  const raw   = 'sakura2024' + today + 'sakuramoong_salt';
+  const raw   = 'sg_gas_token_xk9m' + today + 'sakuramoong_salt';
   let hash = 0;
   for (let i = 0; i < raw.length; i++) {
     hash = ((hash << 5) - hash) + raw.charCodeAt(i);
