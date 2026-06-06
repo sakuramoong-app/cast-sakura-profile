@@ -969,9 +969,8 @@ function renderAnswerTab(cast) {
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
             ${Array.from({length:47},(_,i)=>{
               const min = 60 + i*30;
-              const specialLabel = min === 720 ? '720分' : min === 720 ? '' : null;
-              return {key:String(min), label:min+'分'};
-            }).concat([{key:'720特',label:'720分（特）'}]).map(({key,label})=>`
+              return {key:String(min), label:minToLabel(min)};
+            }).concat([{key:'720特',label:'720分・12時間（特）'}]).map(({key,label})=>`
               <div style="background:var(--pink-bg);border-radius:8px;padding:8px">
                 <div style="font-size:11px;color:var(--text2);margin-bottom:4px">${label}</div>
                 <input type="number" class="back-input" data-course="サクラナ" data-min="${key}"
@@ -1014,7 +1013,7 @@ function renderAnswerTab(cast) {
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
             ${[80,100,120,150,180].map(min=>`
               <div style="background:var(--pink-bg);border-radius:8px;padding:8px">
-                <div style="font-size:11px;color:var(--text2);margin-bottom:4px">${min}分</div>
+                <div style="font-size:11px;color:var(--text2);margin-bottom:4px">${minToLabel(min)}</div>
                 <input type="number" class="back-input" data-course="CC" data-min="${min}"
                   value="${cast.backData?.['CC']?.[min]||''}"
                   placeholder="0" min="0" step="100"
@@ -1040,7 +1039,7 @@ function renderAnswerTab(cast) {
               <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
                 ${sub.mins.map(min=>`
                   <div style="background:var(--pink-bg);border-radius:8px;padding:8px">
-                    <div style="font-size:11px;color:var(--text2);margin-bottom:4px">${min}分</div>
+                    <div style="font-size:11px;color:var(--text2);margin-bottom:4px">${minToLabel(min)}</div>
                     <input type="number" class="back-input" data-course="極門_${sub.name}" data-min="${min}"
                       value="${cast.backData?.['極門_'+sub.name]?.[min]||''}"
                       placeholder="0" min="0" step="100"
@@ -1059,7 +1058,7 @@ function renderAnswerTab(cast) {
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
             ${[60,90,120].map(min=>`
               <div style="background:var(--pink-bg);border-radius:8px;padding:8px">
-                <div style="font-size:11px;color:var(--text2);margin-bottom:4px">${min}分</div>
+                <div style="font-size:11px;color:var(--text2);margin-bottom:4px">${minToLabel(min)}</div>
                 <input type="number" class="back-input" data-course="イベ" data-min="${min}"
                   value="${cast.backData?.['イベ']?.[min]||''}"
                   placeholder="0" min="0" step="100"
@@ -1365,6 +1364,15 @@ function switchTab(tab) {
 // =========================================================
 //  バック管理
 // =========================================================
+function minToLabel(min) {
+  const h   = Math.floor(min / 60);
+  const m   = min % 60;
+  const hStr = m === 0
+    ? `${h}時間`
+    : `${h}時間${m}分`;
+  return `${min}分（${hStr}）`;
+}
+
 function switchBackTab(course) {
   ['サクラナ','CC','極門','イベ','オプション'].forEach(c => {
     const content = document.getElementById('backcontent-' + c);
