@@ -990,7 +990,7 @@ function renderAnswerTab(cast) {
 
         <!-- ランク一括入力 -->
         <div style="background:var(--yellow-soft);border:1.5px solid var(--yellow);border-radius:12px;padding:12px 14px;margin-bottom:16px">
-          <div style="font-size:12px;font-weight:700;color:#7a6010;margin-bottom:8px">⚡ ランクプリセットから一括入力</div>
+          <div style="font-size:12px;font-weight:700;color:#7a6010;margin-bottom:8px">⚡ ランクプリセットから一括入力（選択中のタブのみ反映）</div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <select id="back-rank-select" style="
               background:#fff;border:1.5px solid var(--border);border-radius:10px;
@@ -1035,12 +1035,12 @@ function renderAnswerTab(cast) {
 
         <!-- サクラナ -->
         <div id="backcontent-サクラナ">
-          <div style="font-size:12px;font-weight:700;color:var(--pink);margin-bottom:10px">▸ 通常コース（60〜360分・30分刻み）</div>
+          <div style="font-size:12px;font-weight:700;color:var(--pink);margin-bottom:10px">▸ 通常コース（60〜1440分・30分刻み）</div>
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
-            ${[60,90,120,150,180,210,240,270,300,330,360].concat(['720','720特']).map(v=>{
-              const key = String(v);
-              const label = key === '720特' ? '720分・12時間（特）' : minToLabel(Number(key));
-              return `
+            ${Array.from({length:47},(_,i)=>{
+              const min = 60 + i*30;
+              return {key:String(min), label:minToLabel(min)};
+            }).concat([{key:'720特',label:'720分・12時間（特）'}]).map(({key,label})=>`
               <div style="background:var(--pink-bg);border-radius:8px;padding:8px">
                 <div style="font-size:11px;color:var(--text2);margin-bottom:4px">${label}</div>
                 <input type="number" class="back-input" data-course="サクラナ" data-min="${key}"
@@ -1048,24 +1048,24 @@ function renderAnswerTab(cast) {
                   placeholder="0" min="0" step="100"
                   style="width:100%;background:#fff;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;color:var(--text);font-family:inherit;outline:none"
                   oninput="updateBackData('サクラナ','${key}',this.value)">
-              </div>`;
-            }).join('')}
+              </div>
+            `).join('')}
           </div>
           <div style="font-size:12px;font-weight:700;color:var(--pink);margin-bottom:10px">▸ 本指名</div>
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
-            ${[60,90,120,150,180,210,240,270,300,330,360,'720','720特'].map(v=>{
-              const key = String(v) + '本指';
-              const baseLabel = v === '720特' ? '720特' : (v === '720' ? '720分' : v+'分');
-              return `
+            ${Array.from({length:47},(_,i)=>{
+              const min = 60 + i*30;
+              return {key:String(min)+'本指', label:minToLabel(min)};
+            }).concat([{key:'720特本指',label:'720分・12時間（特）'}]).map(({key,label})=>`
               <div style="background:var(--pink-bg);border-radius:8px;padding:8px">
-                <div style="font-size:11px;color:var(--text2);margin-bottom:4px">${baseLabel}（本指名）</div>
+                <div style="font-size:11px;color:var(--text2);margin-bottom:4px">${label}（本指名）</div>
                 <input type="number" class="back-input" data-course="サクラナ" data-min="${key}"
                   value="${cast.backData?.['サクラナ']?.[key]||''}"
                   placeholder="0" min="0" step="100"
                   style="width:100%;background:#fff;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;color:var(--text);font-family:inherit;outline:none"
                   oninput="updateBackData('サクラナ','${key}',this.value)">
-              </div>`;
-            }).join('')}
+              </div>
+            `).join('')}
           </div>
           <div style="font-size:12px;font-weight:700;color:var(--pink);margin-bottom:10px">▸ フリー</div>
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
@@ -2154,6 +2154,15 @@ const BACK_PRESETS = {
   }
 };
 
+// 現在表示中のバックタブ名を返す
+function getCurrentBackTab() {
+  for (const c of ['サクラナ','CC','極門','イベ','オプション']) {
+    const el = document.getElementById('backcontent-' + c);
+    if (el && el.style.display !== 'none') return c;
+  }
+  return 'サクラナ';
+}
+
 function applyBackPreset() {
   const rank = document.getElementById('back-rank-select').value;
   if (!rank) { showToast('ランクを選択してください'); return; }
@@ -2164,31 +2173,56 @@ function applyBackPreset() {
   if (!cast) return;
   if (!cast.backData) cast.backData = {};
 
-  // プリセットを適用（プリセットにあるコース・項目だけ上書き、ないものはそのまま）
-  Object.entries(preset).forEach(([course, vals]) => {
+  const activeTab = getCurrentBackTab();
+
+  // 選択中タブに対応するプリセットキーだけを絞り込む
+  // 極門タブの場合は「極門_」プレフィックスのコース＋オプションを対象とする
+  // それ以外はタブ名と完全一致するコース＋オプションを対象とする
+  const targetKeys = Object.keys(preset).filter(course => {
+    if (activeTab === '極門') return course.startsWith('極門_') || course === 'オプション';
+    return course === activeTab || course === 'オプション';
+  });
+
+  if (targetKeys.length === 0) {
+    showToast(`⚠️ ${rank}ランクに${activeTab}のデータはありません`);
+    return;
+  }
+
+  // 対象コースのみ適用
+  targetKeys.forEach(course => {
     if (!cast.backData[course]) cast.backData[course] = {};
-    Object.entries(vals).forEach(([key, val]) => {
+    Object.entries(preset[course]).forEach(([key, val]) => {
       cast.backData[course][key] = val;
     });
   });
 
-  // 全タブ（非表示含む）の入力欄を更新
-  // display:noneでもdata属性でアクセスできるので直接更新
-  ['サクラナ','CC','極門','イベ','オプション'].forEach(course => {
-    const container = document.getElementById('backcontent-' + course);
-    if (!container) return;
+  // 現在表示中のタブの入力欄を更新
+  const container = document.getElementById('backcontent-' + activeTab);
+  if (container) {
     container.querySelectorAll('.back-input').forEach(inp => {
       const c   = inp.dataset.course;
       const key = inp.dataset.min;
       if (cast.backData[c]?.[key] !== undefined) {
         inp.value = cast.backData[c][key];
       }
-      // プリセットにない項目は既存の値を維持（空欄はそのまま）
     });
-  });
+  }
+  // オプションタブも更新（表示中でなくてもデータだけ反映済み）
+  if (activeTab !== 'オプション') {
+    const optContainer = document.getElementById('backcontent-オプション');
+    if (optContainer) {
+      optContainer.querySelectorAll('.back-input').forEach(inp => {
+        const c   = inp.dataset.course;
+        const key = inp.dataset.min;
+        if (cast.backData[c]?.[key] !== undefined) {
+          inp.value = cast.backData[c][key];
+        }
+      });
+    }
+  }
 
   saveCastsCache();
-  showToast(`✅ ${rank}ランクのプリセットを適用しました！`);
+  showToast(`✅ ${rank}ランク（${activeTab}）を適用しました！`);
 
   const badge = document.getElementById('badge-back');
   if (badge) { badge.textContent = '設定済'; badge.style.background = 'var(--mint-soft)'; badge.style.color = '#1a6640'; }
