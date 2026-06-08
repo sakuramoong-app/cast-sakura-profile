@@ -581,6 +581,20 @@ function logout() {
   }
 })();
 
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✅';
+    btn.style.borderColor = 'var(--mint)';
+    btn.style.color = '#1a6640';
+    setTimeout(() => {
+      btn.textContent = orig;
+      btn.style.borderColor = 'var(--border)';
+      btn.style.color = 'var(--text2)';
+    }, 1500);
+  });
+}
+
 // =========================================================
 //  XSSエスケープ
 // =========================================================
@@ -747,19 +761,49 @@ function renderAnswerTab(cast) {
       </div>
       <div class="panel-body" id="info-view-mode">
         <div class="info-grid">
-          <div class="info-item"><div class="info-label">① 源氏名</div><div class="info-value">${cast.name}</div></div>
-          <div class="info-item"><div class="info-label">② 年齢</div><div class="info-value">${cast.age}歳</div></div>
-          <div class="info-item"><div class="info-label">③ ３サイズ</div><div class="info-value">${cast.size}</div></div>
-          <div class="info-item"><div class="info-label">④ Pサイズ</div><div class="info-value">${cast.psize || '—'}</div></div>
-          <div class="info-item"><div class="info-label">⑤ 性格</div><div class="info-value">${cast.personality || '—'}</div></div>
-          <div class="info-item"><div class="info-label">⑥ 趣味</div><div class="info-value">${cast.hobby || '—'}</div></div>
-          <div class="info-item"><div class="info-label">⑦ 性感帯</div><div class="info-value">${cast.erogenous || '—'}</div></div>
-          <div class="info-item"><div class="info-label">⑧ チャームポイント</div><div class="info-value">${cast.charm || '—'}</div></div>
-          <div class="info-item"><div class="info-label">⑨ 状態（竿/玉）</div><div class="info-value">${cast.state || '—'}</div></div>
-          <div class="info-item"><div class="info-label">⑩ 髪の毛</div><div class="info-value">${cast.hair || '—'}</div></div>
-          <div class="info-item"><div class="info-label">得意技</div><div class="info-value">${cast.skill || '—'}</div></div>
-          <div class="info-item"><div class="info-label">タバコ</div><div class="info-value">${cast.tabako || '—'}</div></div>
-          <div class="info-item full"><div class="info-label">雰囲気</div><div class="info-value">${(cast.vibes||[]).join('・') || '—'}</div></div>
+          ${[
+            {label:'① 源氏名',        val: esc(cast.name)},
+            {label:'② 年齢',          val: esc(String(cast.age))+'歳'},
+            {label:'③ ３サイズ',      val: esc(cast.size)},
+            {label:'④ Pサイズ',       val: esc(cast.psize||'—')},
+            {label:'⑤ 性格',          val: esc(cast.personality||'—')},
+            {label:'⑥ 趣味',          val: esc(cast.hobby||'—')},
+            {label:'⑦ 性感帯',        val: esc(cast.erogenous||'—')},
+            {label:'⑧ チャームポイント',val: esc(cast.charm||'—')},
+            {label:'⑨ 状態（竿/玉）', val: esc(cast.state||'—')},
+            {label:'⑩ 髪の毛',        val: esc(cast.hair||'—')},
+            {label:'得意技',           val: esc(cast.skill||'—')},
+            {label:'タバコ',           val: esc(cast.tabako||'—')},
+          ].map(({label,val}) => `
+            <div class="info-item" style="position:relative">
+              <div class="info-label">${label}</div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+                <div class="info-value">${val}</div>
+                <button onclick="copyText('${val.replace(/'/g,"\\'")}',this)" style="
+                  flex-shrink:0;background:var(--white);border:1px solid var(--border);
+                  border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;
+                  color:var(--text2);cursor:pointer;font-family:inherit;transition:all .15s;
+                " onmouseover="this.style.borderColor='var(--pink)';this.style.color='var(--pink)'"
+                  onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">
+                  📋
+                </button>
+              </div>
+            </div>
+          `).join('')}
+          <div class="info-item full" style="position:relative">
+            <div class="info-label">雰囲気</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+              <div class="info-value">${esc((cast.vibes||[]).join('・')||'—')}</div>
+              <button onclick="copyText('${esc((cast.vibes||[]).join('・')||'—').replace(/'/g,"\\'")}',this)" style="
+                flex-shrink:0;background:var(--white);border:1px solid var(--border);
+                border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;
+                color:var(--text2);cursor:pointer;font-family:inherit;transition:all .15s;
+              " onmouseover="this.style.borderColor='var(--pink)';this.style.color='var(--pink)'"
+                onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">
+                📋
+              </button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="panel-body" id="info-edit-mode" style="display:none">
