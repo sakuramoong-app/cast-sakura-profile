@@ -595,6 +595,24 @@ function copyText(text, btn) {
   });
 }
 
+function copyFieldText(id, btn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const text = el.innerText || el.textContent || '';
+  if (!text.trim() || text === '未入力') { showToast('コピーする内容がありません'); return; }
+  navigator.clipboard.writeText(text.trim()).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✅ コピー済';
+    btn.style.borderColor = 'var(--mint)';
+    btn.style.color = '#1a6640';
+    setTimeout(() => {
+      btn.textContent = orig;
+      btn.style.borderColor = 'var(--border)';
+      btn.style.color = 'var(--text2)';
+    }, 1500);
+  });
+}
+
 // =========================================================
 //  XSSエスケープ
 // =========================================================
@@ -894,6 +912,7 @@ function renderAnswerTab(cast) {
       <div class="panel-header">
         <div class="panel-title">💬 キャストからひとこと（素材）</div>
         <div style="display:flex;align-items:center;gap:6px">
+          <button onclick="copyFieldText('view-comment',this)" style="background:var(--white);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;color:var(--text2);cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.borderColor='var(--pink)';this.style.color='var(--pink)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">📋 コピー</button>
           <span id="badge-comment" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:var(--yellow-soft);color:#9a7000">${cast.comment ? '確定' : '新着'}</span>
           <button id="editbtn-comment" onclick="toggleFieldEdit('comment')" style="background:var(--pink-soft);border:1.5px solid var(--pink-mid);border-radius:10px;padding:5px 12px;font-size:12px;font-weight:700;color:var(--pink);cursor:pointer;font-family:inherit;transition:all .2s">✏️ 編集する</button>
         </div>
@@ -908,6 +927,7 @@ function renderAnswerTab(cast) {
       <div class="panel-header">
         <div class="panel-title">✍️ 店長から一言</div>
         <div style="display:flex;align-items:center;gap:6px">
+          <button onclick="copyFieldText('view-manager',this)" style="background:var(--white);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;color:var(--text2);cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.borderColor='var(--pink)';this.style.color='var(--pink)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">📋 コピー</button>
           <span id="badge-manager" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:var(--yellow-soft);color:#9a7000">${cast.generatedManagerComment ? '確定' : '新着'}</span>
           <button id="editbtn-manager" onclick="toggleFieldEdit('manager')" style="background:var(--pink-soft);border:1.5px solid var(--pink-mid);border-radius:10px;padding:5px 12px;font-size:12px;font-weight:700;color:var(--pink);cursor:pointer;font-family:inherit;transition:all .2s">✏️ 編集する</button>
         </div>
