@@ -1702,7 +1702,9 @@ function saveAllEdits() {
     comment:      cast.comment  || '',
     internal:     cast.internal || '',
     options:      cast.options  || {},
-    optMemo:      cast.optMemo  || {}
+    optMemo:      cast.optMemo  || {},
+    backData:     cast.backData  || {},
+    honshimei:    cast.honshimei || {}
   }));
   fetch(GAS_URL, {
     method: 'POST',
