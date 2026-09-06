@@ -2882,10 +2882,15 @@ async function loadFromGAS() {
           const keepStatus   = casts[idx].status !== 'new' ? casts[idx].status : (c.status || 'new');
           const keepCastCom  = casts[idx].generatedCastComment    || c.generatedCastComment    || '';
           const keepMgrCom   = casts[idx].generatedManagerComment || c.generatedManagerComment || '';
+          // backData・honshimeiはGAS側を優先（GASに中身があればGASを使う）
+          const gasBackData  = c.backData  && Object.keys(c.backData).length  > 0 ? c.backData  : (casts[idx].backData  || {});
+          const gasHonshimei = c.honshimei && Object.keys(c.honshimei).length > 0 ? c.honshimei : (casts[idx].honshimei || {});
           casts[idx] = { ...casts[idx], ...c };
           casts[idx].status                  = keepStatus;
           casts[idx].generatedCastComment    = keepCastCom;
           casts[idx].generatedManagerComment = keepMgrCom;
+          casts[idx].backData                = gasBackData;
+          casts[idx].honshimei               = gasHonshimei;
         } else {
           c.status = c.status || 'new';
           casts.push(c);
