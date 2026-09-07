@@ -939,9 +939,18 @@ function renderAnswerTab(cast) {
   const { options: storeOptions, optMemo: storeOptMemo } = getStoreOptions(cast, storeKey);
 
   function renderOptCol(list) {
+    // ◎○△×（旧データでは○の代わりに◯が使われている場合がある）以外の値が入っている行は、
+    // 過去に備考欄ではなく「値」欄へ直接自由記述が入力されてしまった旧データ。
+    // その場合でも文字が縦に折り返される（縦書き化）ことがないよう、value側は
+    // 1行nowrap+ellipsisで安全に表示する（正常な◎○△×はこれまで通り24px固定表示）。
+    const STD_VALS = ['◎','○','◯','△','×','—'];
     return list.map(([key, label]) => {
-      const v    = storeOptions?.[key] || '—';
-      const cls  = v==='◎'?'v-maru':v==='○'?'v-maru2':v==='△'?'v-sank':'v-batu';
+      const raw = storeOptions?.[key] || '—';
+      const isStd = STD_VALS.includes(raw);
+      const cls = raw==='◎'?'v-maru':(raw==='○'||raw==='◯')?'v-maru2':raw==='△'?'v-sank':'v-batu';
+      const valStyle = isStd
+        ? 'font-size:14px;font-weight:700;margin-left:6px;flex-shrink:0'
+        : 'font-size:12px;font-weight:700;margin-left:6px;flex-shrink:0;width:auto;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right';
       const memo = storeOptMemo?.[key]
         ? `<div style="font-size:11px;color:var(--text2);font-weight:400;margin-top:3px;white-space:normal">（${storeOptMemo[key]}）</div>`
         : '';
@@ -950,7 +959,7 @@ function renderAnswerTab(cast) {
       return `<div style="background:var(--pink-bg);border-radius:10px;padding:10px 12px;margin-bottom:6px">
         <div style="display:flex;align-items:center;min-width:0">
           <div style="font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1">${label}</div>
-          <div class="opt-val ${cls}" style="font-size:14px;font-weight:700;margin-left:6px;flex-shrink:0">${v}</div>
+          <div class="opt-val ${cls}" style="${valStyle}" title="${esc(raw)}">${raw}</div>
         </div>
         ${memo}
       </div>`;
@@ -1083,13 +1092,15 @@ function renderAnswerTab(cast) {
             return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
               ${allOpts.map(([key, label]) => {
                 const cur = storeOptions?.[key] || '';
+                // 旧データで○の代わりに◯が入っている場合も、見た目上は○として選択状態を表示する
+                const curNorm = cur === '◯' ? '○' : cur;
                 return `<div style="background:var(--pink-bg);border-radius:10px;padding:8px 10px">
                   <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px">${label}</div>
                   <div style="display:flex;gap:4px">
                     ${['◎','○','△','×'].map(v => `
                       <label style="flex:1;text-align:center">
-                        <input type="radio" name="opt-edit-${key}" value="${v}" ${cur===v?'checked':''} onchange="updateOptVal('${key}',this.value)" style="display:none">
-                        <span style="display:block;border-radius:6px;padding:5px 2px;font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);transition:all .15s;${cur===v?getBtnStyle(v):'color:var(--text2)'}">${v}</span>
+                        <input type="radio" name="opt-edit-${key}" value="${v}" ${curNorm===v?'checked':''} onchange="updateOptVal('${key}',this.value)" style="display:none">
+                        <span style="display:block;border-radius:6px;padding:5px 2px;font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);transition:all .15s;${curNorm===v?getBtnStyle(v):'color:var(--text2)'}">${v}</span>
                       </label>`).join('')}
                   </div>
                   <input type="text" placeholder="備考" value="${storeOptMemo?.[key]||''}" onchange="updateOptMemo('${key}',this.value)" style="
