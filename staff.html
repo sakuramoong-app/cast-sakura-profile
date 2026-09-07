@@ -958,9 +958,9 @@ function renderAnswerTab(cast) {
   }
 
   const optRows = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px;align-items:start">
-      <div>${renderOptCol(OPT_LEFT)}</div>
-      <div>${renderOptCol(OPT_RIGHT)}</div>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 12px;align-items:start">
+      <div style="min-width:0">${renderOptCol(OPT_LEFT)}</div>
+      <div style="min-width:0">${renderOptCol(OPT_RIGHT)}</div>
     </div>
   `;
 
