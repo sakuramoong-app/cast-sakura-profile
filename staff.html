@@ -121,6 +121,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
   background:transparent;transition:all .2s;
 }
 .tab-btn.active{background:var(--white);color:var(--pink);box-shadow:0 1px 6px rgba(255,143,171,.2);}
+#panel-basic,#panel-option,#panel-comment,#panel-manager,#panel-internal,#panel-back,#panel-log{scroll-margin-top:112px;}
 
 /* CONTENT AREA */
 .content{flex:1;padding:24px;}
@@ -673,7 +674,7 @@ const LOG_TYPES = [
   { key: '入店',           label: '✅ 入店' },
   { key: '退店',           label: '🚪 退店' },
   { key: 'ヒアリング',      label: '💬 ヒアリング' },
-  { key: 'クレーム_キャスト', label: '⚠️ クレーム（キャストから）' },
+  { key: 'クレーム_キャスト', label: '⚠️ 要望・不満' },
   { key: 'クレーム_客',      label: '🚨 クレーム（お客様から）' },
 ];
 function logTypeLabel(key) {
@@ -1018,7 +1019,23 @@ function renderAnswerTab(cast) {
   `;
 
   el.innerHTML = `
-    <div class="panel">
+    <div style="position:sticky;top:var(--header-h);z-index:8;background:var(--bg);margin:-24px -24px 16px;padding:12px 24px 10px;border-bottom:1.5px solid var(--border)">
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${[
+          ['panel-basic','📋 基本情報'],
+          ['panel-option','✅ オプション可否'],
+          ['panel-comment','💬 ひとこと'],
+          ['panel-manager','✍️ 店長一言'],
+          ['panel-internal','🔒 内勤連絡'],
+          ['panel-back','💴 バック設定'],
+          ['panel-log','🗓 記録・ログ'],
+        ].map(([id,label]) => `
+          <button onclick="jumpToPanel('${id}')" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;border:1.5px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .15s" onmouseover="this.style.borderColor='var(--pink)';this.style.color='var(--pink)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">${label}</button>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="panel" id="panel-basic">
       <div class="panel-header">
         <div class="panel-title">📋 基本情報</div>
         <button onclick="toggleEdit()" id="edit-btn" style="
@@ -1117,7 +1134,7 @@ function renderAnswerTab(cast) {
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="panel-option">
       <div class="panel-header">
         <div class="panel-title">✅ オプション可否</div>
         <button onclick="toggleOptEdit()" id="opt-edit-btn" style="
@@ -1232,15 +1249,15 @@ function renderAnswerTab(cast) {
     ` : ''}
 
     <div class="panel" id="panel-back">
-      <div class="panel-header">
-        <div class="panel-title">💴 バック設定</div>
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+      <div class="panel-header" onclick="toggleBackPanel()" style="cursor:pointer">
+        <div class="panel-title"><span id="back-panel-arrow" style="display:inline-block;margin-right:4px;font-size:11px;color:var(--text2);transition:transform .15s">▶</span>💴 バック設定</div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap" onclick="event.stopPropagation()">
           <span id="badge-back" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:var(--yellow-soft);color:#9a7000">${(cast.backData && Object.keys(cast.backData).length > 0) ? '設定済' : '未設定'}</span>
           <span style="font-size:11px;color:var(--text2)">表示中：${STORE_LABEL_MAP[storeKey] || storeKey} のバック</span>
           ${storeKey !== 'サクラムーン' && STORE_TO_BACK[storeKey] === 'サクラナ' ? '<span style="font-size:11px;background:#e8f4e8;color:#1a6640;padding:3px 8px;border-radius:6px;font-weight:700">サクラナバック共通</span>' : ''}
         </div>
       </div>
-      <div class="panel-body">
+      <div class="panel-body" id="back-panel-body" style="display:none">
 
         <!-- 本指名加算設定 -->
         <div style="background:var(--lav-soft);border:1.5px solid #c8b0f0;border-radius:12px;padding:12px 14px;margin-bottom:12px">
@@ -2560,6 +2577,20 @@ function minToLabel(min) {
     ? `${h}時間`
     : `${h}時間${m}分`;
   return `${min}分（${hStr}）`;
+}
+
+function jumpToPanel(id) {
+  const target = document.getElementById(id);
+  if (target && target.scrollIntoView) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function toggleBackPanel() {
+  const body  = document.getElementById('back-panel-body');
+  const arrow = document.getElementById('back-panel-arrow');
+  if (!body) return;
+  const opening = body.style.display === 'none';
+  body.style.display = opening ? 'block' : 'none';
+  if (arrow) arrow.style.transform = opening ? 'rotate(90deg)' : 'rotate(0deg)';
 }
 
 function switchBackTab(course) {
