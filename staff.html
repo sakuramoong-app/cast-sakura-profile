@@ -357,7 +357,10 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
       <input class="search-input" type="text" placeholder="🔍 キャスト名で検索…" oninput="filterCasts(this.value)">
     </div>
     <div class="sidebar-list" id="sidebar-list">
-      <div class="sidebar-section">在籍キャスト</div>
+      <div style="display:flex;gap:6px;padding:0 2px 10px">
+        <button id="sidebar-mode-active" onclick="setSidebarMode('active')" style="flex:1;padding:6px 4px;border-radius:8px;font-size:12px;font-weight:700;border:1.5px solid var(--pink);background:var(--pink);color:#fff;cursor:pointer;font-family:inherit;transition:all .15s">在籍キャスト</button>
+        <button id="sidebar-mode-retired" onclick="setSidebarMode('retired')" style="flex:1;padding:6px 4px;border-radius:8px;font-size:12px;font-weight:700;border:1.5px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;font-family:inherit;transition:all .15s">退店キャスト</button>
+      </div>
       <div id="cast-list-wrap"></div>
     </div>
     <button class="add-cast-btn" onclick="openModal()">＋ キャストを手動追加</button>
@@ -661,6 +664,33 @@ function saveCastsCache() {
 let currentCastId = null;
 let currentTab = 'answer';
 let currentStoreTab = 'サクラムーン';
+let sidebarMode = 'active'; // 'active'（在籍キャスト） | 'retired'（退店キャスト）
+let logFilter   = '全て';   // 記録・ログパネルの絞り込み種別
+
+// 記録・ログの種別定義（面接日・入店日・退店日もこのログに統一して記録する）
+const LOG_TYPES = [
+  { key: '面接',           label: '📋 面接' },
+  { key: '入店',           label: '✅ 入店' },
+  { key: '退店',           label: '🚪 退店' },
+  { key: 'ヒアリング',      label: '💬 ヒアリング' },
+  { key: 'クレーム_キャスト', label: '⚠️ クレーム（キャストから）' },
+  { key: 'クレーム_客',      label: '🚨 クレーム（お客様から）' },
+];
+function logTypeLabel(key) {
+  const t = LOG_TYPES.find(t => t.key === key);
+  return t ? t.label : (key || '');
+}
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function formatDT(iso) {
+  if (!iso) return '未記録';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return String(iso);
+  return d.getFullYear() + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + String(d.getDate()).padStart(2,'0') +
+    ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
 
 // 店舗定義
 const STORES = [
@@ -823,12 +853,26 @@ const BULK_TEXT_FIELDS = [
 // =========================================================
 //  サイドバー
 // =========================================================
+function setSidebarMode(mode) {
+  sidebarMode = mode;
+  const activeBtn  = document.getElementById('sidebar-mode-active');
+  const retiredBtn = document.getElementById('sidebar-mode-retired');
+  if (activeBtn && retiredBtn) {
+    const onStyle  = 'border:1.5px solid var(--pink);background:var(--pink);color:#fff';
+    const offStyle = 'border:1.5px solid var(--border);background:#fff;color:var(--text2)';
+    activeBtn.setAttribute('style',  `flex:1;padding:6px 4px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;${mode==='active'?onStyle:offStyle}`);
+    retiredBtn.setAttribute('style', `flex:1;padding:6px 4px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;${mode==='retired'?onStyle:offStyle}`);
+  }
+  renderSidebar(document.querySelector('.search-input')?.value || '');
+}
+
 function renderSidebar(filter) {
   const wrap = document.getElementById('cast-list-wrap');
   wrap.innerHTML = '';
   // サイドバーの表示名は常にサクラムーン（基準店舗）の源氏名で統一する
   const baseName = c => getField(c, 'サクラムーン', 'name') || c.name || '';
-  let list = filter ? casts.filter(c => baseName(c).includes(filter)) : [...casts];
+  let list = casts.filter(c => sidebarMode === 'retired' ? !!c.retired : !c.retired);
+  if (filter) list = list.filter(c => baseName(c).includes(filter));
   // 名前のあいうえお順（名字・名前を分けずに名前全体で比較）
   list.sort((a, b) => baseName(a).localeCompare(baseName(b), 'ja'));
   list.forEach(c => {
@@ -844,7 +888,7 @@ function renderSidebar(filter) {
       <div class="cast-avatar" style="background:${AVATAR_COLORS[c.colorIdx % AVATAR_COLORS.length]}">${(name[0]||'?')}</div>
       <div class="cast-info">
         <div class="cast-name">${esc(name)}</div>
-        <div class="cast-meta">${esc(String(age))}歳 / ${esc(size ? size.split('-')[0] : '—')}</div>
+        <div class="cast-meta">${esc(String(age))}歳 / ${esc(size ? size.split('-')[0] : '—')}${c.retired ? `　🚪${esc(c.leaveDate||'')}退店` : ''}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
         <div class="cast-status ${statusClass}">${statusLabel}</div>
@@ -1690,6 +1734,8 @@ function renderAnswerTab(cast) {
       </div>
     </div>
 
+    ${renderLogPanel(cast)}
+
     <div style="position:sticky;bottom:16px;padding:0 0 8px">
       <button onclick="saveAllEdits()" style="
         width:100%;background:linear-gradient(135deg,#7DD8B0,#4CC494);
@@ -1705,6 +1751,268 @@ function renderAnswerTab(cast) {
 
   window._editMode = false;
   window._optEditMode = false;
+}
+
+// =========================================================
+//  記録・ログ（面接日・入店日・退店日・ヒアリング・クレーム等を統合したタイムライン）
+// =========================================================
+function renderLogPanel(cast) {
+  const logs = (cast.logs || []).slice().sort((a, b) =>
+    (b.date || '').localeCompare(a.date || '') || (b.createdAt || '').localeCompare(a.createdAt || '')
+  );
+  const filtered = logFilter === '全て' ? logs : logs.filter(l => l.type === logFilter);
+
+  const logRows = filtered.length ? filtered.map(l => `
+    <div style="background:var(--pink-bg);border-radius:10px;padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;gap:8px">
+        <span style="font-size:12px;font-weight:700;color:var(--pink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(logTypeLabel(l.type))}</span>
+        <span style="font-size:11px;color:var(--text2);white-space:nowrap;flex-shrink:0">${esc(l.date || '')}</span>
+      </div>
+      ${l.reservationDate ? `<div style="font-size:11px;color:var(--text2);margin-bottom:4px">予約日時：${esc(l.reservationDate)}</div>` : ''}
+      <div style="font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.6">${esc(l.content || '')}</div>
+    </div>
+  `).join('') : `<div style="text-align:center;color:var(--text2);font-size:13px;padding:20px 0">記録はまだありません</div>`;
+
+  const filterBtns = ['全て', ...LOG_TYPES.map(t => t.key)].map(k => {
+    const label  = k === '全て' ? '全て' : logTypeLabel(k);
+    const active = logFilter === k;
+    return `<button onclick="setLogFilter('${k}')" style="
+      padding:5px 10px;border-radius:8px;font-size:11px;font-weight:700;
+      border:1.5px solid ${active ? 'var(--pink)' : 'var(--border)'};
+      background:${active ? 'var(--pink)' : '#fff'};color:${active ? '#fff' : 'var(--text2)'};
+      cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap
+    ">${label}</button>`;
+  }).join('');
+
+  return `
+    <div class="panel" id="panel-log">
+      <div class="panel-header">
+        <div class="panel-title">🗓 記録・ログ</div>
+        ${!cast.retired
+          ? `<button onclick="openRetireModal()" style="background:#fff0f0;border:1.5px solid #FF8FAB;border-radius:10px;padding:6px 14px;font-size:12px;font-weight:700;color:#e0507a;cursor:pointer;font-family:inherit;transition:all .2s">🚪 退店にする</button>`
+          : `<span style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:10px;background:#eee;color:#888">退店済み（${esc(cast.leaveDate || '')}）</span>`
+        }
+      </div>
+      <div class="panel-body">
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin-bottom:14px">
+          <div>
+            <div style="font-size:11px;color:var(--text2);margin-bottom:4px">📋 面接日</div>
+            <input type="date" id="log-interviewDate" value="${esc(cast.interviewDate || '')}" onchange="updateQuickDateField('interviewDate', this.value)"
+              style="width:100%;background:var(--pink-bg);border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:13px;color:var(--text);font-family:inherit;outline:none">
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text2);margin-bottom:4px">✅ 入店日</div>
+            <input type="date" id="log-joinDate" value="${esc(cast.joinDate || '')}" onchange="updateQuickDateField('joinDate', this.value)"
+              style="width:100%;background:var(--pink-bg);border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:13px;color:var(--text);font-family:inherit;outline:none">
+          </div>
+        </div>
+        <div style="margin-bottom:14px">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px">💭 入店理由・目標</div>
+          <textarea id="log-joinReason" onchange="updateQuickTextField('joinReason', this.value)" placeholder="入店理由や目標があれば記入してください"
+            style="width:100%;background:var(--pink-bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--text);font-family:inherit;outline:none;resize:vertical;min-height:50px">${esc(cast.joinReason || '')}</textarea>
+        </div>
+        ${cast.retired ? `
+        <div style="margin-bottom:14px">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px">🚪 退店日・退店理由</div>
+          <div style="background:#f5f5f5;border-radius:8px;padding:10px;font-size:13px;color:var(--text)">
+            <div style="margin-bottom:4px;color:var(--text2)">${esc(cast.leaveDate || '')}</div>
+            <div style="white-space:pre-wrap">${esc(cast.leaveReason || '（理由未記入）')}</div>
+          </div>
+        </div>` : ''}
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #f0f0f0">
+          <div>
+            <div style="font-size:11px;color:var(--text2);margin-bottom:4px">📤 プロフ提出日時</div>
+            <div style="font-size:13px;color:var(--text)">${esc(formatDT(cast.submittedAt))}</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text2);margin-bottom:4px">🔄 プロフ最終更新日時</div>
+            <div style="font-size:13px;color:var(--text)">${esc(formatDT(cast.updatedAt))}</div>
+          </div>
+        </div>
+
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px">📚 記録タイムライン</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">${filterBtns}</div>
+        <div style="max-height:340px;overflow-y:auto;margin-bottom:14px">${logRows}</div>
+
+        <div style="background:var(--lav-soft);border-radius:10px;padding:12px">
+          <div style="font-size:12px;font-weight:700;color:#5020aa;margin-bottom:8px">➕ 記録を追加</div>
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin-bottom:8px">
+            <select id="newlog-type" onchange="onNewLogTypeChange()" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;outline:none">
+              ${LOG_TYPES.filter(t => t.key !== '退店').map(t => `<option value="${t.key}">${t.label}</option>`).join('')}
+            </select>
+            <input type="date" id="newlog-date" value="${todayStr()}" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <div id="newlog-reservation-wrap" style="display:none;margin-bottom:8px">
+            <div style="font-size:11px;color:var(--text2);margin-bottom:4px">予約日時</div>
+            <input type="datetime-local" id="newlog-reservation" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+          <textarea id="newlog-content" placeholder="内容を入力してください" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--text);font-family:inherit;outline:none;resize:vertical;min-height:60px;margin-bottom:8px"></textarea>
+          <button onclick="submitNewLog()" style="width:100%;background:linear-gradient(135deg,#B7A6FF,#9B7EF0);border:none;border-radius:10px;padding:10px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;transition:all .2s">追加する</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function setLogFilter(key) {
+  logFilter = key;
+  const cast = casts.find(c => c.id === currentCastId);
+  if (cast) renderAnswerTab(cast);
+}
+
+function onNewLogTypeChange() {
+  const type = document.getElementById('newlog-type')?.value;
+  const wrap = document.getElementById('newlog-reservation-wrap');
+  if (wrap) wrap.style.display = (type === 'クレーム_客') ? 'block' : 'none';
+}
+
+function updateQuickDateField(field, value) {
+  const cast = casts.find(c => c.id === currentCastId);
+  if (!cast) return;
+  cast[field] = value;
+  saveCastsCache();
+}
+
+function updateQuickTextField(field, value) {
+  const cast = casts.find(c => c.id === currentCastId);
+  if (!cast) return;
+  cast[field] = value;
+  saveCastsCache();
+}
+
+// GASへ1件のログを追加保存（追記型なので他の保存操作とは独立してすぐ送信する）
+async function postLogEntry(cast, entry) {
+  try {
+    const form = new FormData();
+    form.append('payload', JSON.stringify({
+      _type: 'addLog',
+      _token: generateGasToken(),
+      castId: String(cast.id),
+      castName: getField(cast, 'サクラムーン', 'name') || cast.name || '',
+      logType: entry.type,
+      date: entry.date || '',
+      reservationDate: entry.reservationDate || '',
+      content: entry.content || '',
+    }));
+    await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: form });
+  } catch (e) { console.warn('ログ保存エラー:', e); }
+}
+
+function submitNewLog() {
+  const cast = casts.find(c => c.id === currentCastId);
+  if (!cast) return;
+  const type    = document.getElementById('newlog-type')?.value;
+  const date    = document.getElementById('newlog-date')?.value || todayStr();
+  const content = document.getElementById('newlog-content')?.value?.trim();
+  const reservationDate = document.getElementById('newlog-reservation')?.value || '';
+  if (!content) { showToast('⚠️ 内容を入力してください'); return; }
+
+  const entry = {
+    id: 'local-' + Date.now(),
+    type, date, content,
+    reservationDate: type === 'クレーム_客' ? reservationDate : '',
+    createdAt: new Date().toISOString(),
+  };
+  if (!cast.logs) cast.logs = [];
+  cast.logs.push(entry);
+  saveCastsCache();
+  postLogEntry(cast, entry);
+  showToast('📝 記録を追加しました');
+  renderAnswerTab(cast);
+}
+
+// =========================================================
+//  退店処理
+// =========================================================
+function openRetireModal() {
+  const cast = casts.find(c => c.id === currentCastId);
+  if (!cast) return;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'retire-modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center';
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'background:#fff;border-radius:20px;padding:24px;width:360px;max-height:90vh;overflow-y:auto;font-family:inherit';
+
+  modal.innerHTML = `
+    <div style="font-size:16px;font-weight:800;color:#333;margin-bottom:6px">🚪 ${esc(getField(cast,'サクラムーン','name')||cast.name)}さんを退店にする</div>
+    <div style="font-size:12px;color:#888;margin-bottom:16px">退店日は本日（${todayStr()}）で記録され、在籍キャスト一覧から退店キャスト一覧へ移動します。</div>
+    <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px">退店理由</div>
+    <textarea id="retire-reason" placeholder="退店理由を入力してください" style="width:100%;background:var(--pink-bg);border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--text);font-family:inherit;outline:none;resize:vertical;min-height:80px;margin-bottom:20px"></textarea>
+    <div style="display:flex;gap:8px">
+      <button onclick="confirmRetire()" style="
+        flex:1;padding:12px;border-radius:12px;border:none;
+        background:linear-gradient(135deg,#FF6B9D,#FF8FAB);
+        color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit
+      ">退店にする</button>
+      <button onclick="document.getElementById('retire-modal-overlay').remove()" style="
+        flex:1;padding:12px;border-radius:12px;border:1.5px solid #ddd;
+        background:#fff;color:#666;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit
+      ">キャンセル</button>
+    </div>`;
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
+async function confirmRetire() {
+  const cast = casts.find(c => c.id === currentCastId);
+  if (!cast) return;
+  const reason = document.getElementById('retire-reason')?.value?.trim() || '';
+  const leaveDate = todayStr();
+
+  cast.retired     = true;
+  cast.leaveDate   = leaveDate;
+  cast.leaveReason = reason;
+  if (!cast.logs) cast.logs = [];
+  const entry = { id: 'local-' + Date.now(), type: '退店', date: leaveDate, content: reason || '（理由未記入）', createdAt: new Date().toISOString() };
+  cast.logs.push(entry);
+  saveCastsCache();
+
+  document.getElementById('retire-modal-overlay')?.remove();
+
+  // サーバーへ反映：固定フィールドの更新 と ログの追記
+  try {
+    const form = new FormData();
+    form.append('payload', JSON.stringify({
+      _type: 'updateConfirmed',
+      _token: generateGasToken(),
+      id: String(cast.id),
+      name: cast.name,
+      status: cast.status,
+      castComment:  cast.generatedCastComment || '',
+      comment:      getField(cast, 'サクラムーン', 'comment')    || '',
+      mgrComment:   getField(cast, 'サクラムーン', 'mgrComment') || '',
+      internal:     getField(cast, 'サクラムーン', 'internal')   || '',
+      options: cast.options || {},
+      optMemo: cast.optMemo || {},
+      backData: cast.backData || {},
+      honshimei: cast.honshimei || {},
+      storeProfiles: cast.storeProfiles || {},
+      interviewDate: cast.interviewDate || '',
+      joinDate:      cast.joinDate || '',
+      joinReason:    cast.joinReason || '',
+      leaveDate:     cast.leaveDate,
+      leaveReason:   cast.leaveReason,
+      retired:       true,
+    }));
+    await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: form });
+  } catch (e) { console.warn('退店処理の保存エラー:', e); }
+  await postLogEntry(cast, entry);
+
+  showToast('🚪 退店キャストに移動しました');
+  setSidebarMode('active');
+  document.getElementById('topbar-name').textContent = 'キャストを選択してください';
+  document.getElementById('topbar-status').innerHTML = '';
+  document.getElementById('tab-wrap').style.display = 'none';
+  document.getElementById('main-content').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">👈</div>
+        <div class="empty-title">キャストを選んでください</div>
+        <div class="empty-sub">左のリストからキャストを選ぶと<br>回答内容とプロフ生成ができます</div>
+      </div>`;
+  currentCastId = null;
 }
 
 function toggleEdit() {
@@ -1935,6 +2243,9 @@ function saveAllEdits() {
     backData:      cast.backData      || {},
     honshimei:     cast.honshimei     || {},
     storeProfiles: cast.storeProfiles || {},
+    interviewDate: cast.interviewDate || '',
+    joinDate:      cast.joinDate      || '',
+    joinReason:    cast.joinReason    || '',
   }));
   fetch(GAS_URL, {
     method: 'POST',
@@ -3206,7 +3517,10 @@ function addManualCast() {
     internal: document.getElementById('m-internal').value,
     vibes: [], options: {}, optMemo: {},
     status: 'draft',
-    colorIdx: casts.length % AVATAR_COLORS.length
+    colorIdx: casts.length % AVATAR_COLORS.length,
+    interviewDate: '', joinDate: '', leaveDate: '',
+    joinReason: '', leaveReason: '', retired: false,
+    submittedAt: new Date().toISOString(), updatedAt: '', logs: [],
   };
   // サクラムーン店舗プロフとして初期化
   newCast.storeProfiles = { 'サクラムーン': { active: true } };
@@ -3419,12 +3733,26 @@ async function loadFromGAS() {
           casts[idx].backData                = gasBackData;
           casts[idx].honshimei               = gasHonshimei;
           casts[idx].storeProfiles           = gasStoreProf;
+          casts[idx].retired                 = c.retired === true || c.retired === 'TRUE' || c.retired === 'true';
         } else {
-          c.status = c.status || 'new';
+          c.status  = c.status || 'new';
+          c.retired = c.retired === true || c.retired === 'TRUE' || c.retired === 'true';
           casts.push(c);
           newCount++;
         }
       });
+
+      // 記録・ログ（面接日/入店日/退店日/ヒアリング/クレーム等）を別途取得してキャストごとに紐付け
+      try {
+        const logsRes  = await fetch(`${GAS_URL}?action=getLogs`);
+        const logsData = await logsRes.json();
+        if (logsData.result === 'ok') {
+          const allLogs = logsData.logs || [];
+          casts.forEach(c => {
+            c.logs = allLogs.filter(l => String(l.castId) === String(c.id));
+          });
+        }
+      } catch (e) { console.warn('ログ取得エラー:', e); }
 
       if (data.serverTime) {
         localStorage.setItem('sakuraMoon_lastSync', data.serverTime);
