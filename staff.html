@@ -371,8 +371,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
     <div class="topbar">
       <div class="topbar-name" id="topbar-name">キャストを選択してください</div>
       <div id="topbar-status"></div>
-      <div id="tab-wrap" style="display:none;align-items:center;gap:8px">
-        <span style="font-size:13px;font-weight:700;color:var(--pink)">📋 回答内容</span>
+      <div id="tab-wrap" style="display:none;align-items:center;gap:4px;flex-wrap:wrap" id="store-tab-wrap">
       </div>
     </div>
 
@@ -661,7 +660,165 @@ function saveCastsCache() {
 
 let currentCastId = null;
 let currentTab = 'answer';
+let currentStoreTab = 'サクラムーン';
+
+// 店舗定義
+const STORES = [
+  { key: 'サクラムーン', label: 'サクラ', color: '#FF6B9D', short: 'サクラ' },
+  { key: 'ラナ鶯谷',    label: 'ラナ鶯谷', color: '#9B59B6', short: 'ラナ鶯' },
+  { key: 'ラナ錦糸町',  label: 'ラナ錦', color: '#8E44AD', short: 'ラナ錦' },
+  { key: 'ドレスガーデン', label: 'ドレス', color: '#E74C3C', short: 'ドレス' },
+  { key: 'ピーチムーン五反田', label: 'ピーチ', color: '#E91E8C', short: 'ピーチ' },
+  { key: '逆AF倶楽部',  label: '逆AF', color: '#2C3E50', short: '逆AF' },
+  { key: 'キューティー', label: 'CC', color: '#16A085', short: 'CC' },
+  { key: '18',          label: '18', color: '#D35400', short: '18' },
+  { key: '極門',        label: '極門', color: '#1A5276', short: '極門' },
+];
+
+// 店舗キー→バックタブキーのマッピング
+const STORE_TO_BACK = {
+  'サクラムーン':      'サクラナ',
+  'ラナ鶯谷':         'サクラナ',
+  'ラナ錦糸町':       'サクラナ',
+  'ドレスガーデン':   'サクラナ',
+  'ピーチムーン五反田':'サクラナ',
+  '逆AF倶楽部':      'サクラナ', // サクラナバック共通 + 加算設定
+  'キューティー':     'CC',
+  '18':               'サクラナ',
+  '極門':             '極門',
+};
+// 逆AF倶楽部はサクラナバック共通 + cast.honshimei.gyakuaf_add 円加算
+const STORE_LABEL_MAP = {
+  'サクラムーン':      '🌸 サクラムーン',
+  'ラナ鶯谷':         '🌙 ラナ鶯谷',
+  'ラナ錦糸町':       '🌙 ラナ錦糸町',
+  'ドレスガーデン':   '🌹 ドレスガーデン',
+  'ピーチムーン五反田':'🍑 ピーチムーン',
+  '逆AF倶楽部':      '🔄 逆AF倶楽部',
+  'キューティー':     '💎 キューティー',
+  '18':               '🔞 18',
+  '極門':             '⚡ 極門',
+};
 let generatedText = '';
+
+// =========================================================
+//  店舗別プロフ（storeProfiles）ヘルパー
+//  ① 全プロフ項目をstoreProfilesへ移行するための共通ロジック
+// =========================================================
+// 店舗ごとに持つプロフ項目（オプション可否・バック・本指名加算は共通のため含めない）
+const STORE_PROFILE_FIELDS = [
+  'name','age','size','psize','state','hair','personality','hobby',
+  'charm','tabako','erogenous','skill','vibes','comment','mgrComment','internal'
+];
+// storeProfiles[storeKey][field]が未設定の場合に読みにいく「レガシー（旧フラット）フィールド」の対応表
+const LEGACY_FIELD_MAP = {
+  name:'name', age:'age', size:'size', psize:'psize', state:'state', hair:'hair',
+  personality:'personality', hobby:'hobby', charm:'charm', tabako:'tabako',
+  erogenous:'erogenous', skill:'skill', vibes:'vibes',
+  comment:'comment', mgrComment:'generatedManagerComment', internal:'internal'
+};
+
+function isEmptyVal(v) {
+  return v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
+}
+
+// 店舗ごとのプロフ項目を取得。サクラムーンのみ未移行の旧データにフォールバックする（他店舗は空から入力のため）
+function getField(cast, storeKey, field) {
+  const sp = cast.storeProfiles && cast.storeProfiles[storeKey];
+  if (sp && !isEmptyVal(sp[field])) return sp[field];
+  if (storeKey === 'サクラムーン') {
+    const legacy = cast[LEGACY_FIELD_MAP[field] ?? field];
+    if (!isEmptyVal(legacy)) return legacy;
+  }
+  return field === 'vibes' ? [] : '';
+}
+
+// 店舗ごとのプロフ項目を保存。サクラムーンの場合は後方互換のため旧フラットフィールドにもミラーする
+function setField(cast, storeKey, field, value) {
+  if (!cast.storeProfiles) cast.storeProfiles = {};
+  if (!cast.storeProfiles[storeKey]) cast.storeProfiles[storeKey] = { active: true };
+  cast.storeProfiles[storeKey][field] = value;
+  if (storeKey === 'サクラムーン') {
+    const legacyField = LEGACY_FIELD_MAP[field] ?? field;
+    cast[legacyField] = value;
+  }
+}
+
+// オプション可否も店舗ごとに持たせる（サクラムーンのみ旧フラットcast.options/optMemoにフォールバック、他店舗は空から）
+function getStoreOptions(cast, storeKey) {
+  const sp = cast.storeProfiles && cast.storeProfiles[storeKey];
+  if (sp && sp.options && Object.keys(sp.options).length > 0) {
+    return { options: sp.options, optMemo: sp.optMemo || {} };
+  }
+  if (storeKey === 'サクラムーン') {
+    return { options: cast.options || {}, optMemo: cast.optMemo || {} };
+  }
+  return { options: {}, optMemo: {} };
+}
+function setStoreOption(cast, storeKey, key, val) {
+  if (!cast.storeProfiles) cast.storeProfiles = {};
+  if (!cast.storeProfiles[storeKey]) cast.storeProfiles[storeKey] = { active: true };
+  if (!cast.storeProfiles[storeKey].options) cast.storeProfiles[storeKey].options = {};
+  cast.storeProfiles[storeKey].options[key] = val;
+  if (storeKey === 'サクラムーン') {
+    if (!cast.options) cast.options = {};
+    cast.options[key] = val;
+  }
+}
+function setStoreOptionMemo(cast, storeKey, key, val) {
+  if (!cast.storeProfiles) cast.storeProfiles = {};
+  if (!cast.storeProfiles[storeKey]) cast.storeProfiles[storeKey] = { active: true };
+  if (!cast.storeProfiles[storeKey].optMemo) cast.storeProfiles[storeKey].optMemo = {};
+  cast.storeProfiles[storeKey].optMemo[key] = val;
+  if (storeKey === 'サクラムーン') {
+    if (!cast.optMemo) cast.optMemo = {};
+    cast.optMemo[key] = val;
+  }
+}
+
+// ③ 店舗ごとのバック表示タブ（コースキーは既存のバックデータキーのまま、ラベルのみ店舗連動）
+const STORE_BACK_TABS = {
+  'サクラムーン':       [{key:'サクラナ',label:'通常バック'}, {key:'イベ',label:'イベ'}, {key:'オプション',label:'オプション'}],
+  'ラナ鶯谷':          [{key:'サクラナ',label:'通常バック'}, {key:'イベ',label:'イベ'}, {key:'オプション',label:'オプション'}],
+  'ラナ錦糸町':        [{key:'サクラナ',label:'通常バック'}, {key:'イベ',label:'イベ'}, {key:'オプション',label:'オプション'}],
+  'ドレスガーデン':    [{key:'サクラナ',label:'通常バック'}, {key:'イベ',label:'イベ'}, {key:'オプション',label:'オプション'}],
+  'ピーチムーン五反田': [{key:'サクラナ',label:'通常バック'}, {key:'イベ',label:'イベ'}, {key:'オプション',label:'オプション'}],
+  '逆AF倶楽部':        [{key:'サクラナ',label:'通常バック'}, {key:'イベ',label:'イベ'}, {key:'オプション',label:'オプション'}],
+  '18':                [{key:'サクラナ',label:'通常バック'}, {key:'イベ',label:'イベ'}, {key:'オプション',label:'オプション'}],
+  'キューティー':      [{key:'CC',label:'通常バック'}, {key:'オプション',label:'オプション'}],
+  '極門':              [{key:'極門',label:'通常バック'}, {key:'イベ',label:'イベ'}, {key:'オプション',label:'オプション'}],
+};
+
+// ④ 一括反映で選べる項目（バックは対象外）。基本情報・オプション可否はアコーディオンで項目単位選択、
+//   キャストからひとこと（素材）・店長から一言・内勤への連絡事項は単体チェックボックス
+const BULK_BASIC_ITEMS = [
+  {field:'name',        label:'源氏名'},
+  {field:'age',         label:'年齢'},
+  {field:'size',        label:'３サイズ'},
+  {field:'psize',       label:'Pサイズ'},
+  {field:'state',       label:'状態（竿/玉）'},
+  {field:'hair',        label:'髪の毛'},
+  {field:'personality', label:'性格'},
+  {field:'hobby',       label:'趣味'},
+  {field:'charm',       label:'チャームポイント'},
+  {field:'tabako',      label:'タバコ'},
+  {field:'erogenous',   label:'性感帯'},
+  {field:'skill',       label:'得意技'},
+  {field:'vibes',       label:'雰囲気'},
+];
+const OPT_LABEL_MAP = {
+  'AF':'AF','逆AF':'逆ＡＦ','前立腺マッサージ':'前立腺マッサージ','兜合わせ':'兜合わせ','玉舐め':'玉舐め','キス':'キス',
+  '全身リップ':'全身リップ','乳首責め':'乳首責め','生フェラ':'生フェラ','69':'69','Sプレイ':'Sプレイ','Mプレイ':'Mプレイ',
+  'お泊りコース':'お泊りコース','デートコース':'デートコース','キャスト射精（有料）':'射精（有料）',
+  'コース内キャスト2回以上射精（有料）':'キャスト無限射精（有料）','3P／お客様2名（有料）':'3P／お客様2名（有料）',
+  '3P／キャスト2名（有料）':'3P／キャスト2名（有料）','コスプレ（有料）':'コスプレ（有料）','ごっくん（有料）':'ごっくん（有料）',
+  '聖水（有料）':'聖水（有料）','女装されているお客様':'女装されているお客様','外国人のお客様':'外国人のお客様'
+};
+const BULK_TEXT_FIELDS = [
+  {field:'comment',    label:'キャストからひとこと（素材）'},
+  {field:'mgrComment', label:'店長から一言'},
+  {field:'internal',   label:'内勤への連絡事項'},
+];
 
 // =========================================================
 //  サイドバー
@@ -669,20 +826,25 @@ let generatedText = '';
 function renderSidebar(filter) {
   const wrap = document.getElementById('cast-list-wrap');
   wrap.innerHTML = '';
-  let list = filter ? casts.filter(c => c.name.includes(filter)) : [...casts];
+  // サイドバーの表示名は常にサクラムーン（基準店舗）の源氏名で統一する
+  const baseName = c => getField(c, 'サクラムーン', 'name') || c.name || '';
+  let list = filter ? casts.filter(c => baseName(c).includes(filter)) : [...casts];
   // 名前のあいうえお順（名字・名前を分けずに名前全体で比較）
-  list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ja'));
+  list.sort((a, b) => baseName(a).localeCompare(baseName(b), 'ja'));
   list.forEach(c => {
+    const name = baseName(c);
+    const age  = getField(c, 'サクラムーン', 'age')  || c.age;
+    const size = getField(c, 'サクラムーン', 'size') || c.size;
     const div = document.createElement('div');
     div.className = 'cast-card' + (c.id === currentCastId ? ' active' : '');
     div.onclick = () => selectCast(c.id);
     const statusLabel = {new:'新着',editing:'編集中',confirmed:'確定',done:'確定',draft:'手動'}[c.status] || '新着';
     const statusClass = {new:'status-new',editing:'status-editing',confirmed:'status-confirmed',done:'status-confirmed',draft:'status-draft'}[c.status] || 'status-new';
     div.innerHTML = `
-      <div class="cast-avatar" style="background:${AVATAR_COLORS[c.colorIdx % AVATAR_COLORS.length]}">${c.name[0]}</div>
+      <div class="cast-avatar" style="background:${AVATAR_COLORS[c.colorIdx % AVATAR_COLORS.length]}">${(name[0]||'?')}</div>
       <div class="cast-info">
-        <div class="cast-name">${esc(c.name)}</div>
-        <div class="cast-meta">${esc(String(c.age))}歳 / ${esc(c.size ? c.size.split('-')[0] : '—')}</div>
+        <div class="cast-name">${esc(name)}</div>
+        <div class="cast-meta">${esc(String(age))}歳 / ${esc(size ? size.split('-')[0] : '—')}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
         <div class="cast-status ${statusClass}">${statusLabel}</div>
@@ -701,15 +863,17 @@ function filterCasts(val) { renderSidebar(val); }
 function selectCast(id) {
   currentCastId = id;
   currentTab = 'answer';
+  currentStoreTab = 'サクラムーン';
   generatedText = '';
   renderSidebar();
   const cast = casts.find(c => c.id === id);
   if (!cast) return;
-  document.getElementById('topbar-name').textContent = cast.name;
+  document.getElementById('topbar-name').textContent = getField(cast, currentStoreTab, 'name') || cast.name;
   const statusLabel = {new:'新着',editing:'編集中',confirmed:'確定',done:'確定',draft:'手動'}[cast.status] || '新着';
   const statusClass = {new:'status-new',editing:'status-editing',confirmed:'status-confirmed',done:'status-confirmed',draft:'status-draft'}[cast.status] || 'status-new';
   document.getElementById('topbar-status').innerHTML = `<div class="cast-status ${statusClass}" style="font-size:12px;padding:4px 12px">${statusLabel}</div>`;
   document.getElementById('tab-wrap').style.display = 'flex';
+  renderStoreTabs(cast);
   renderAnswerTab(cast);
 }
 
@@ -718,6 +882,31 @@ function selectCast(id) {
 // =========================================================
 function renderAnswerTab(cast) {
   const el = document.getElementById('main-content');
+  // 現在の店舗プロフデータを取得
+  const storeKey = currentStoreTab || 'サクラムーン';
+  if (!cast.storeProfiles) cast.storeProfiles = {};
+  if (!cast.storeProfiles[storeKey]) cast.storeProfiles[storeKey] = { active: true };
+  // ① 基本プロフ項目は全て店舗ごと（storeProfiles[storeKey]）から取得。サクラムーンのみ旧データにフォールバック
+  const fName        = getField(cast, storeKey, 'name');
+  const fAge         = getField(cast, storeKey, 'age');
+  const fSize        = getField(cast, storeKey, 'size');
+  const fPsize       = getField(cast, storeKey, 'psize');
+  const fState       = getField(cast, storeKey, 'state');
+  const fHair        = getField(cast, storeKey, 'hair');
+  const fPersonality = getField(cast, storeKey, 'personality');
+  const fHobby       = getField(cast, storeKey, 'hobby');
+  const fCharm       = getField(cast, storeKey, 'charm');
+  const fTabako      = getField(cast, storeKey, 'tabako');
+  const fErogenous   = getField(cast, storeKey, 'erogenous');
+  const fSkill       = getField(cast, storeKey, 'skill');
+  const fVibes       = getField(cast, storeKey, 'vibes');
+  // 店舗ごとの一言・店長コメント・内勤
+  const storeComment    = getField(cast, storeKey, 'comment');
+  const storeMgrComment = getField(cast, storeKey, 'mgrComment');
+  const storeInternal   = getField(cast, storeKey, 'internal');
+  // バックタブキー（③ 店舗ごとに表示するタブのセット）
+  const backTabKey = STORE_TO_BACK[storeKey] || 'サクラナ';
+  const backTabs   = STORE_BACK_TABS[storeKey] || STORE_BACK_TABS['サクラムーン'];
   const OPT_LEFT = [
     ['AF',                                  'AF'],
     ['逆AF',                                '逆ＡＦ'],
@@ -746,16 +935,23 @@ function renderAnswerTab(cast) {
     ['外国人のお客様',                      '外国人のお客様（必ず事前にご申告ください）'],
   ];
 
+  // オプション可否も店舗ごとのデータ（サクラムーンのみ旧データにフォールバック、他店舗は空から）
+  const { options: storeOptions, optMemo: storeOptMemo } = getStoreOptions(cast, storeKey);
+
   function renderOptCol(list) {
     return list.map(([key, label]) => {
-      const v    = cast.options?.[key] || '—';
+      const v    = storeOptions?.[key] || '—';
       const cls  = v==='◎'?'v-maru':v==='○'?'v-maru2':v==='△'?'v-sank':'v-batu';
-      const memo = cast.optMemo?.[key]
-        ? `<span style="font-size:11px;color:var(--text2);font-weight:400;margin-left:auto;padding-left:8px;white-space:nowrap">（${cast.optMemo[key]}）</span>`
+      const memo = storeOptMemo?.[key]
+        ? `<div style="font-size:11px;color:var(--text2);font-weight:400;margin-top:3px;white-space:normal">（${storeOptMemo[key]}）</div>`
         : '';
-      return `<div style="background:var(--pink-bg);border-radius:10px;padding:10px 12px;display:flex;align-items:center;margin-bottom:6px">
-        <div style="font-size:14px;font-weight:700;color:var(--text)">${label}</div>
-        <div class="opt-val ${cls}" style="font-size:14px;font-weight:700;margin-left:6px;flex-shrink:0">${v}</div>
+      // ラベルが長い場合に文字が縦に折り返される（縦書き化）のを防ぐため、
+      // ラベル＋値の行と備考の行を分け、ラベルはnowrap・flex:1・min-width:0で横一行を維持する
+      return `<div style="background:var(--pink-bg);border-radius:10px;padding:10px 12px;margin-bottom:6px">
+        <div style="display:flex;align-items:center;min-width:0">
+          <div style="font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1">${label}</div>
+          <div class="opt-val ${cls}" style="font-size:14px;font-weight:700;margin-left:6px;flex-shrink:0">${v}</div>
+        </div>
         ${memo}
       </div>`;
     }).join('');
@@ -781,18 +977,18 @@ function renderAnswerTab(cast) {
       <div class="panel-body" id="info-view-mode">
         <div class="info-grid">
           ${[
-            {label:'① 源氏名',        val: esc(cast.name)},
-            {label:'② 年齢',          val: esc(String(cast.age))+'歳'},
-            {label:'③ ３サイズ',      val: esc(cast.size)},
-            {label:'④ Pサイズ',       val: esc(cast.psize||'—')},
-            {label:'⑤ 性格',          val: esc(cast.personality||'—')},
-            {label:'⑥ 趣味',          val: esc(cast.hobby||'—')},
-            {label:'⑦ 性感帯',        val: esc(cast.erogenous||'—')},
-            {label:'⑧ チャームポイント',val: esc(cast.charm||'—')},
-            {label:'⑨ 状態（竿/玉）', val: esc(cast.state||'—')},
-            {label:'⑩ 髪の毛',        val: esc(cast.hair||'—')},
-            {label:'得意技',           val: esc(cast.skill||'—')},
-            {label:'タバコ',           val: esc(cast.tabako||'—')},
+            {label:'① 源氏名',        val: esc(fName)},
+            {label:'② 年齢',          val: esc(String(fAge))+'歳'},
+            {label:'③ ３サイズ',      val: esc(fSize)},
+            {label:'④ Pサイズ',       val: esc(fPsize||'—')},
+            {label:'⑤ 性格',          val: esc(fPersonality||'—')},
+            {label:'⑥ 趣味',          val: esc(fHobby||'—')},
+            {label:'⑦ 性感帯',        val: esc(fErogenous||'—')},
+            {label:'⑧ チャームポイント',val: esc(fCharm||'—')},
+            {label:'⑨ 状態（竿/玉）', val: esc(fState||'—')},
+            {label:'⑩ 髪の毛',        val: esc(fHair||'—')},
+            {label:'得意技',           val: esc(fSkill||'—')},
+            {label:'タバコ',           val: esc(fTabako||'—')},
           ].map(({label,val}) => `
             <div class="info-item" style="position:relative">
               <div class="info-label">${label}</div>
@@ -812,8 +1008,8 @@ function renderAnswerTab(cast) {
           <div class="info-item full" style="position:relative">
             <div class="info-label">雰囲気</div>
             <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
-              <div class="info-value">${esc((cast.vibes||[]).join('・')||'—')}</div>
-              <button onclick="copyText('${esc((cast.vibes||[]).join('・')||'—').replace(/'/g,"\\'")}',this)" style="
+              <div class="info-value">${esc((fVibes||[]).join('・')||'—')}</div>
+              <button onclick="copyText('${esc((fVibes||[]).join('・')||'—').replace(/'/g,"\\'")}',this)" style="
                 flex-shrink:0;background:var(--white);border:1px solid var(--border);
                 border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;
                 color:var(--text2);cursor:pointer;font-family:inherit;transition:all .15s;
@@ -828,18 +1024,18 @@ function renderAnswerTab(cast) {
       <div class="panel-body" id="info-edit-mode" style="display:none">
         <div class="info-grid">
           ${[
-            ['name','① 源氏名',cast.name],
-            ['age','② 年齢',cast.age],
-            ['size','③ ３サイズ',cast.size],
-            ['psize','④ Pサイズ',cast.psize],
-            ['personality','⑤ 性格',cast.personality],
-            ['hobby','⑥ 趣味',cast.hobby],
-            ['erogenous','⑦ 性感帯',cast.erogenous],
-            ['charm','⑧ チャームポイント',cast.charm],
-            ['state','⑨ 状態（竿/玉）',cast.state],
-            ['hair','⑩ 髪の毛',cast.hair],
-            ['skill','得意技',cast.skill],
-            ['tabako','タバコ',cast.tabako],
+            ['name','① 源氏名',fName],
+            ['age','② 年齢',fAge],
+            ['size','③ ３サイズ',fSize],
+            ['psize','④ Pサイズ',fPsize],
+            ['personality','⑤ 性格',fPersonality],
+            ['hobby','⑥ 趣味',fHobby],
+            ['erogenous','⑦ 性感帯',fErogenous],
+            ['charm','⑧ チャームポイント',fCharm],
+            ['state','⑨ 状態（竿/玉）',fState],
+            ['hair','⑩ 髪の毛',fHair],
+            ['skill','得意技',fSkill],
+            ['tabako','タバコ',fTabako],
           ].map(([id,label,val]) => `
             <div class="info-item">
               <div class="info-label">${label}</div>
@@ -851,7 +1047,7 @@ function renderAnswerTab(cast) {
             </div>`).join('')}
           <div class="info-item full">
             <div class="info-label">雰囲気</div>
-            <input id="edit-vibes" type="text" value="${(cast.vibes||[]).join('・')}" style="
+            <input id="edit-vibes" type="text" value="${(fVibes||[]).join('・')}" style="
               width:100%;background:var(--pink-bg);border:1.5px solid var(--border);
               border-radius:8px;padding:7px 10px;font-size:13px;color:var(--text);
               font-family:inherit;outline:none;
@@ -886,7 +1082,7 @@ function renderAnswerTab(cast) {
             const allOpts = [...OPT_LEFT, ...OPT_RIGHT];
             return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
               ${allOpts.map(([key, label]) => {
-                const cur = cast.options?.[key] || '';
+                const cur = storeOptions?.[key] || '';
                 return `<div style="background:var(--pink-bg);border-radius:10px;padding:8px 10px">
                   <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px">${label}</div>
                   <div style="display:flex;gap:4px">
@@ -896,7 +1092,7 @@ function renderAnswerTab(cast) {
                         <span style="display:block;border-radius:6px;padding:5px 2px;font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);transition:all .15s;${cur===v?getBtnStyle(v):'color:var(--text2)'}">${v}</span>
                       </label>`).join('')}
                   </div>
-                  <input type="text" placeholder="備考" value="${cast.optMemo?.[key]||''}" onchange="updateOptMemo('${key}',this.value)" style="
+                  <input type="text" placeholder="備考" value="${storeOptMemo?.[key]||''}" onchange="updateOptMemo('${key}',this.value)" style="
                     width:100%;margin-top:6px;background:#fff;border:1px solid var(--border);
                     border-radius:6px;padding:4px 8px;font-size:11px;color:var(--text);
                     font-family:inherit;outline:none;
@@ -914,13 +1110,13 @@ function renderAnswerTab(cast) {
         <div class="panel-title">💬 キャストからひとこと（素材）</div>
         <div style="display:flex;align-items:center;gap:6px">
           <button onclick="copyFieldText('view-comment',this)" style="background:var(--white);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;color:var(--text2);cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.borderColor='var(--pink)';this.style.color='var(--pink)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">📋 コピー</button>
-          <span id="badge-comment" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:var(--yellow-soft);color:#9a7000">${cast.comment ? '確定' : '新着'}</span>
+          <span id="badge-comment" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:var(--yellow-soft);color:#9a7000">${storeComment ? '確定' : '新着'}</span>
           <button id="editbtn-comment" onclick="toggleFieldEdit('comment')" style="background:var(--pink-soft);border:1.5px solid var(--pink-mid);border-radius:10px;padding:5px 12px;font-size:12px;font-weight:700;color:var(--pink);cursor:pointer;font-family:inherit;transition:all .2s">✏️ 編集する</button>
         </div>
       </div>
       <div class="panel-body">
-        <div id="view-comment" style="background:var(--pink-bg);border-radius:10px;padding:12px 14px;font-size:14px;line-height:1.8;color:var(--text);white-space:pre-wrap;min-height:50px">${cast.comment || '<span style="color:var(--text2)">未入力</span>'}</div>
-        <textarea id="edit-comment" style="display:none;width:100%;background:var(--pink-bg);border:1.5px solid var(--pink);border-radius:10px;padding:12px 14px;font-size:14px;color:var(--text);font-family:inherit;outline:none;resize:none;min-height:90px;line-height:1.8">${cast.comment || ''}</textarea>
+        <div id="view-comment" style="background:var(--pink-bg);border-radius:10px;padding:12px 14px;font-size:14px;line-height:1.8;color:var(--text);white-space:pre-wrap;min-height:50px">${storeComment || '<span style="color:var(--text2)">未入力</span>'}</div>
+        <textarea id="edit-comment" style="display:none;width:100%;background:var(--pink-bg);border:1.5px solid var(--pink);border-radius:10px;padding:12px 14px;font-size:14px;color:var(--text);font-family:inherit;outline:none;resize:none;min-height:90px;line-height:1.8">${storeComment || ''}</textarea>
       </div>
     </div>
 
@@ -929,13 +1125,13 @@ function renderAnswerTab(cast) {
         <div class="panel-title">✍️ 店長から一言</div>
         <div style="display:flex;align-items:center;gap:6px">
           <button onclick="copyFieldText('view-manager',this)" style="background:var(--white);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;color:var(--text2);cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.borderColor='var(--pink)';this.style.color='var(--pink)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">📋 コピー</button>
-          <span id="badge-manager" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:var(--yellow-soft);color:#9a7000">${cast.generatedManagerComment ? '確定' : '新着'}</span>
+          <span id="badge-manager" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:var(--yellow-soft);color:#9a7000">${storeMgrComment ? '確定' : '新着'}</span>
           <button id="editbtn-manager" onclick="toggleFieldEdit('manager')" style="background:var(--pink-soft);border:1.5px solid var(--pink-mid);border-radius:10px;padding:5px 12px;font-size:12px;font-weight:700;color:var(--pink);cursor:pointer;font-family:inherit;transition:all .2s">✏️ 編集する</button>
         </div>
       </div>
       <div class="panel-body">
-        <div id="view-manager" style="background:var(--pink-bg);border-radius:10px;padding:12px 14px;font-size:14px;line-height:1.8;color:var(--text);white-space:pre-wrap;min-height:50px">${cast.generatedManagerComment || '<span style="color:var(--text2)">未入力</span>'}</div>
-        <textarea id="edit-manager" style="display:none;width:100%;background:var(--pink-bg);border:1.5px solid var(--pink);border-radius:10px;padding:12px 14px;font-size:14px;color:var(--text);font-family:inherit;outline:none;resize:none;min-height:130px;line-height:1.8" placeholder="店長から一言を入力してください">${cast.generatedManagerComment || ''}</textarea>
+        <div id="view-manager" style="background:var(--pink-bg);border-radius:10px;padding:12px 14px;font-size:14px;line-height:1.8;color:var(--text);white-space:pre-wrap;min-height:50px">${storeMgrComment || '<span style="color:var(--text2)">未入力</span>'}</div>
+        <textarea id="edit-manager" style="display:none;width:100%;background:var(--pink-bg);border:1.5px solid var(--pink);border-radius:10px;padding:12px 14px;font-size:14px;color:var(--text);font-family:inherit;outline:none;resize:none;min-height:130px;line-height:1.8" placeholder="店長から一言を入力してください">${storeMgrComment || ''}</textarea>
       </div>
     </div>
 
@@ -944,17 +1140,17 @@ function renderAnswerTab(cast) {
         <div class="panel-title">🔒 内勤への連絡事項</div>
         <div style="display:flex;align-items:center;gap:6px">
           <div class="panel-badge" style="background:var(--lav-soft);color:#6030aa">内勤のみ</div>
-          <span id="badge-internal" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:var(--yellow-soft);color:#9a7000">${cast.internal ? '確定' : '新着'}</span>
+          <span id="badge-internal" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:var(--yellow-soft);color:#9a7000">${storeInternal ? '確定' : '新着'}</span>
           <button id="editbtn-internal" onclick="toggleFieldEdit('internal')" style="background:var(--pink-soft);border:1.5px solid var(--pink-mid);border-radius:10px;padding:5px 12px;font-size:12px;font-weight:700;color:var(--pink);cursor:pointer;font-family:inherit;transition:all .2s">✏️ 編集する</button>
         </div>
       </div>
       <div class="panel-body">
-        <div id="view-internal" style="background:var(--lav-soft);border-radius:10px;padding:12px 14px;font-size:14px;line-height:1.8;color:var(--text);white-space:pre-wrap;min-height:50px">${cast.internal || '<span style="color:var(--text2)">未入力</span>'}</div>
-        <textarea id="edit-internal" style="display:none;width:100%;background:var(--lav-soft);border:1.5px solid var(--lavender);border-radius:10px;padding:12px 14px;font-size:14px;color:var(--text);font-family:inherit;outline:none;resize:none;min-height:80px;line-height:1.8">${cast.internal || ''}</textarea>
+        <div id="view-internal" style="background:var(--lav-soft);border-radius:10px;padding:12px 14px;font-size:14px;line-height:1.8;color:var(--text);white-space:pre-wrap;min-height:50px">${storeInternal || '<span style="color:var(--text2)">未入力</span>'}</div>
+        <textarea id="edit-internal" style="display:none;width:100%;background:var(--lav-soft);border:1.5px solid var(--lavender);border-radius:10px;padding:12px 14px;font-size:14px;color:var(--text);font-family:inherit;outline:none;resize:none;min-height:80px;line-height:1.8">${storeInternal || ''}</textarea>
       </div>
     </div>
 
-    ${cast.generatedCastComment ? `
+    ${storeComment ? `
     <div class="panel" style="border-color:var(--mint);background:var(--mint-soft)">
       <div class="panel-header" style="border-color:var(--mint)">
         <div class="panel-title" style="color:#1a6640">✅ 完成プロフ</div>
@@ -963,11 +1159,11 @@ function renderAnswerTab(cast) {
       <div class="panel-body">
         <div style="margin-bottom:14px">
           <div style="font-size:11px;font-weight:700;letter-spacing:2px;color:#2a8a60;margin-bottom:8px">本人から一言</div>
-          <div style="background:#fff;border:1.5px solid var(--mint);border-radius:10px;padding:14px;font-size:14px;line-height:1.9;color:var(--text)">${cast.generatedCastComment.replace(/\n/g,'<br>')}</div>
+          <div style="background:#fff;border:1.5px solid var(--mint);border-radius:10px;padding:14px;font-size:14px;line-height:1.9;color:var(--text)">${storeComment.replace(/\n/g,'<br>')}</div>
         </div>
         <div>
           <div style="font-size:11px;font-weight:700;letter-spacing:2px;color:#2a8a60;margin-bottom:8px">店長から一言</div>
-          <div style="background:#fff;border:1.5px solid var(--mint);border-radius:10px;padding:14px;font-size:14px;line-height:1.9;color:var(--text)">${(cast.generatedManagerComment||'').replace(/\n/g,'<br>')}</div>
+          <div style="background:#fff;border:1.5px solid var(--mint);border-radius:10px;padding:14px;font-size:14px;line-height:1.9;color:var(--text)">${(storeMgrComment||'').replace(/\n/g,'<br>')}</div>
         </div>
         <button onclick="copyCompleted()" style="
           margin-top:14px;width:100%;
@@ -983,8 +1179,10 @@ function renderAnswerTab(cast) {
     <div class="panel" id="panel-back">
       <div class="panel-header">
         <div class="panel-title">💴 バック設定</div>
-        <div style="display:flex;align-items:center;gap:6px">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <span id="badge-back" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:var(--yellow-soft);color:#9a7000">${(cast.backData && Object.keys(cast.backData).length > 0) ? '設定済' : '未設定'}</span>
+          <span style="font-size:11px;color:var(--text2)">表示中：${STORE_LABEL_MAP[storeKey] || storeKey} のバック</span>
+          ${storeKey !== 'サクラムーン' && STORE_TO_BACK[storeKey] === 'サクラナ' ? '<span style="font-size:11px;background:#e8f4e8;color:#1a6640;padding:3px 8px;border-radius:6px;font-weight:700">サクラナバック共通</span>' : ''}
         </div>
       </div>
       <div class="panel-body">
@@ -1021,6 +1219,19 @@ function renderAnswerTab(cast) {
           <div style="font-size:11px;color:#7040bb;line-height:1.6">
             CC（キューティー）：一律 +1,000円固定　／　極門：一律 +2,000円固定（★★ランクは +3,000円）
           </div>
+          <!-- 逆AF加算設定 -->
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid #d8c0f0">
+            <div style="font-size:11px;color:#7040bb;margin-bottom:8px;font-weight:700">🔄 逆AF倶楽部 加算設定（サクラナバック共通 + この金額）</div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:12px;color:var(--text2)">+</span>
+              <input type="number" id="honshimei-gyakuaf"
+                value="${cast.honshimei?.gyakuaf_add ?? 0}"
+                min="0" step="100"
+                style="width:80px;background:var(--pink-bg);border:1.5px solid var(--border);border-radius:8px;padding:6px 8px;font-size:14px;font-weight:700;color:var(--text);font-family:inherit;outline:none;text-align:right"
+                oninput="updateHonshimei('gyakuaf_add', this.value)">
+              <span style="font-size:12px;color:var(--text2)">円　※ 0円の場合はサクラナバックと同額</span>
+            </div>
+          </div>
         </div>
 
         <!-- ランク一括入力 -->
@@ -1055,21 +1266,29 @@ function renderAnswerTab(cast) {
           </div>
         </div>
 
-        <!-- コースタブ -->
+        <!-- コースタブ（③ 店舗ごとに表示するタブが変わる） -->
         <div style="display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap">
-          ${['サクラナ','CC','極門','イベ','オプション'].map((c,i) => `
+          ${backTabs.map(({key:c,label}) => {
+            const isActive = c === backTabKey;
+            return `
             <button onclick="switchBackTab('${c}')" id="backtab-${c}" style="
               padding:7px 14px;border-radius:10px;font-size:13px;font-weight:700;
-              border:1.5px solid var(--border);cursor:pointer;font-family:inherit;
-              background:${i===0?'var(--pink)':'var(--white)'};
-              color:${i===0?'#fff':'var(--text2)'};
+              border:1.5px solid ${isActive?'var(--pink)':'var(--border)'};cursor:pointer;font-family:inherit;
+              background:${isActive?'var(--pink)':'var(--white)'};
+              color:${isActive?'#fff':'var(--text2)'};
               transition:all .2s;
-            ">${c}</button>
-          `).join('')}
+            ">${label}</button>`;
+          }).join('')}
         </div>
+
 
         <!-- サクラナ -->
         <div id="backcontent-サクラナ">
+          ${storeKey === '逆AF倶楽部' ? `
+          <div style="background:#e8f4e8;border:1.5px solid #4CAF50;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#1a6640;line-height:1.8">
+            🔄 <b>逆AF倶楽部表示中</b>：サクラナバック共通です<br>
+            逆AF加算：<b>+ ${(cast.honshimei?.gyakuaf_add ?? 0).toLocaleString()}円</b>　が各コースに加算されます
+          </div>` : ''}
           <div style="font-size:12px;font-weight:700;color:var(--pink);margin-bottom:10px">▸ 通常コース（60〜1440分・30分刻み）</div>
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
             ${Array.from({length:47},(_,i)=>{
@@ -1487,12 +1706,13 @@ function toggleEdit() {
 function saveEdit() {
   const cast = casts.find(c => c.id === currentCastId);
   if (!cast) return;
+  const storeKey = currentStoreTab || 'サクラムーン';
   ['name','age','size','psize','personality','hobby','erogenous','charm','state','hair','skill','tabako'].forEach(f => {
     const el = document.getElementById('edit-' + f);
-    if (el) cast[f] = el.value;
+    if (el) setField(cast, storeKey, f, el.value);
   });
   const vibesEl = document.getElementById('edit-vibes');
-  if (vibesEl) cast.vibes = vibesEl.value.split('・').filter(Boolean);
+  if (vibesEl) setField(cast, storeKey, 'vibes', vibesEl.value.split('・').filter(Boolean));
   saveCastsCache();
   toggleEdit();
   showToast('✅ 基本情報を保存しました');
@@ -1538,15 +1758,13 @@ function toggleOptEdit() {
 function updateOptVal(key, val) {
   const cast = casts.find(c => c.id === currentCastId);
   if (!cast) return;
-  if (!cast.options) cast.options = {};
-  cast.options[key] = val;
+  setStoreOption(cast, currentStoreTab || 'サクラムーン', key, val);
 }
 
 function updateOptMemo(key, val) {
   const cast = casts.find(c => c.id === currentCastId);
   if (!cast) return;
-  if (!cast.optMemo) cast.optMemo = {};
-  cast.optMemo[key] = val;
+  setStoreOptionMemo(cast, currentStoreTab || 'サクラムーン', key, val);
 }
 
 // 編集中フィールドを追跡
@@ -1570,9 +1788,8 @@ function toggleFieldEdit(field) {
     btnEl.textContent     = '✏️ 編集する';
     btnEl.style.background = 'var(--pink-soft)';
     btnEl.style.color      = 'var(--pink)';
-    const val = field === 'comment' ? cast?.comment
-              : field === 'manager' ? cast?.generatedManagerComment
-              : cast?.internal;
+    const storeKeyNow = currentStoreTab || 'サクラムーン';
+    const val = cast ? getField(cast, storeKeyNow, field === 'manager' ? 'mgrComment' : field) : '';
     setBadge(field, val ? 'confirmed' : 'new');
   } else {
     // 表示→編集モードへ
@@ -1625,24 +1842,23 @@ function updateCastStatus(cast) {
 function saveAllEdits() {
   const cast = casts.find(c => c.id === currentCastId);
   if (!cast) return;
+  const storeKey = currentStoreTab || 'サクラムーン';
+  if (!cast.storeProfiles) cast.storeProfiles = {};
+  if (!cast.storeProfiles[storeKey]) cast.storeProfiles[storeKey] = { active: true };
 
   // 基本情報
   if (window._editMode) saveEdit();
 
-  // オプション
+  // オプション（店舗ごと）
   if (window._optEditMode) {
     document.querySelectorAll('#opt-edit-mode input[type=radio]:checked').forEach(r => {
       const key = r.name.replace('opt-edit-', '');
-      if (!cast.options) cast.options = {};
-      cast.options[key] = r.value;
+      setStoreOption(cast, storeKey, key, r.value);
     });
     // 備考も保存
     document.querySelectorAll('#opt-edit-mode input[type=text]').forEach(inp => {
       const key = inp.getAttribute('onchange')?.match(/updateOptMemo\('(.+?)'/)?.[1];
-      if (key) {
-        if (!cast.optMemo) cast.optMemo = {};
-        cast.optMemo[key] = inp.value;
-      }
+      if (key) setStoreOptionMemo(cast, storeKey, key, inp.value);
     });
   }
 
@@ -1654,9 +1870,9 @@ function saveAllEdits() {
     if (!editEl) return;
 
     const val = editEl.value;
-    if (field === 'comment')  cast.comment                 = val;
-    if (field === 'manager')  cast.generatedManagerComment = val;
-    if (field === 'internal') cast.internal                = val;
+    if (field === 'comment')  setField(cast, storeKey, 'comment',    val);
+    if (field === 'manager')  setField(cast, storeKey, 'mgrComment', val);
+    if (field === 'internal') setField(cast, storeKey, 'internal',  val);
 
     // 表示モードに戻す
     viewEl.innerHTML      = val ? esc(val) : '<span style="color:var(--text2)">未入力</span>';
@@ -1699,13 +1915,15 @@ function saveAllEdits() {
     name:         cast.name,
     status:       cast.status,
     castComment:  cast.generatedCastComment    || '',
-    mgrComment:   cast.generatedManagerComment || '',
-    comment:      cast.comment  || '',
-    internal:     cast.internal || '',
+    // 3つの確定フィールドは常にサクラムーン（基準店舗）の内容をレガシー列にも同期する
+    comment:      getField(cast, 'サクラムーン', 'comment')    || '',
+    mgrComment:   getField(cast, 'サクラムーン', 'mgrComment') || '',
+    internal:     getField(cast, 'サクラムーン', 'internal')   || '',
     options:      cast.options  || {},
     optMemo:      cast.optMemo  || {},
-    backData:     cast.backData  || {},
-    honshimei:    cast.honshimei || {}
+    backData:      cast.backData      || {},
+    honshimei:     cast.honshimei     || {},
+    storeProfiles: cast.storeProfiles || {},
   }));
   fetch(GAS_URL, {
     method: 'POST',
@@ -1714,10 +1932,300 @@ function saveAllEdits() {
   }).catch(e => console.warn('GAS更新エラー:', e));
 }
 
+
+// =========================================================
+//  店舗タブ描画
+// =========================================================
+function renderStoreTabs(cast) {
+  const wrap = document.getElementById('tab-wrap');
+  if (!wrap) return;
+  const profiles = cast.storeProfiles || {};
+  // サクラムーンは必須、他は在籍設定済みのみ
+  const activeTabs = STORES.filter(s =>
+    s.key === 'サクラムーン' || profiles[s.key]?.active
+  );
+
+  wrap.innerHTML = activeTabs.map(s => {
+    const isActive = s.key === currentStoreTab;
+    return `<button onclick="selectStoretab('${s.key}')" style="
+      padding:6px 12px;border-radius:10px;font-size:12px;font-weight:700;
+      border:1.5px solid ${isActive ? s.color : 'var(--border)'};
+      background:${isActive ? s.color : 'var(--white)'};
+      color:${isActive ? '#fff' : 'var(--text2)'};
+      cursor:pointer;font-family:inherit;transition:all .2s;flex-shrink:0;
+    ">${s.label}</button>`;
+  }).join('') + `
+    <button onclick="openStoreSettings()" style="
+      padding:6px 10px;border-radius:10px;font-size:12px;
+      border:1.5px solid var(--border);background:var(--white);
+      color:var(--text2);cursor:pointer;font-family:inherit;
+    ">⚙️</button>
+    <button onclick="openBulkCopy()" style="
+      padding:6px 12px;border-radius:10px;font-size:12px;font-weight:700;
+      border:1.5px solid var(--pink);background:var(--pink);color:#fff;
+      cursor:pointer;font-family:inherit;transition:all .2s;flex-shrink:0;
+    ">📋 他店舗へ一括反映</button>`;
+}
+
+function selectStoretab(storeKey) {
+  currentStoreTab = storeKey;
+  const cast = casts.find(c => c.id === currentCastId);
+  if (!cast) return;
+  document.getElementById('topbar-name').textContent = getField(cast, storeKey, 'name') || cast.name;
+  renderStoreTabs(cast);
+  renderAnswerTab(cast);
+  // バックタブが表示中なら連動切り替え
+  setTimeout(() => syncBackTabToStore(), 0);
+}
+
+// =========================================================
+//  店舗設定モーダル
+// =========================================================
+function openStoreSettings() {
+  const cast = casts.find(c => c.id === currentCastId);
+  if (!cast) return;
+  if (!cast.storeProfiles) cast.storeProfiles = {};
+
+  const overlay = document.createElement('div');
+  overlay.id = 'store-modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center';
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'background:#fff;border-radius:20px;padding:24px;width:340px;max-height:90vh;overflow-y:auto;font-family:inherit';
+
+  const storeRows = STORES.filter(s => s.key !== 'サクラムーン').map(s => {
+    const active = cast.storeProfiles[s.key]?.active || false;
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0f0">
+        <span style="font-size:14px;font-weight:700;color:#333">${s.label}（${s.key}）</span>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="store-chk-${s.key}" ${active ? 'checked' : ''}
+            style="width:18px;height:18px;cursor:pointer">
+          <span style="font-size:12px;color:#666">${active ? '在籍中' : '非在籍'}</span>
+        </label>
+      </div>`;
+  }).join('');
+
+  modal.innerHTML = `
+    <div style="font-size:16px;font-weight:800;color:#333;margin-bottom:16px">⚙️ 在籍店舗設定</div>
+    <div style="font-size:12px;color:#888;margin-bottom:12px">サクラムーンは必須です。在籍する店舗にチェックを入れてください。</div>
+    <div style="padding:0 4px">${storeRows}</div>
+    <div style="margin-top:20px;display:flex;gap:8px">
+      <button onclick="saveStoreSettings()" style="
+        flex:1;padding:12px;border-radius:12px;border:none;
+        background:linear-gradient(135deg,#FF6B9D,#FF8FAB);
+        color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit
+      ">保存</button>
+      <button onclick="document.getElementById('store-modal-overlay').remove()" style="
+        flex:1;padding:12px;border-radius:12px;border:1.5px solid #ddd;
+        background:#fff;color:#666;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit
+      ">キャンセル</button>
+    </div>`;
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
+function saveStoreSettings() {
+  const cast = casts.find(c => c.id === currentCastId);
+  if (!cast) return;
+  if (!cast.storeProfiles) cast.storeProfiles = {};
+  // サクラムーンは常にactive
+  cast.storeProfiles['サクラムーン'] = cast.storeProfiles['サクラムーン'] || { active: true };
+  cast.storeProfiles['サクラムーン'].active = true;
+
+  STORES.filter(s => s.key !== 'サクラムーン').forEach(s => {
+    const chk = document.getElementById('store-chk-' + s.key);
+    if (!chk) return;
+    if (chk.checked) {
+      if (!cast.storeProfiles[s.key]) cast.storeProfiles[s.key] = {};
+      cast.storeProfiles[s.key].active = true;
+    } else {
+      if (cast.storeProfiles[s.key]) {
+        cast.storeProfiles[s.key].active = false;
+      }
+    }
+  });
+
+  saveCastsCache();
+  document.getElementById('store-modal-overlay').remove();
+  renderStoreTabs(cast);
+  showToast('✅ 店舗設定を保存しました');
+}
+
+// =========================================================
+//  一括反映（サクラムーン → 他店舗）
+// =========================================================
+function openBulkCopy() {
+  const cast = casts.find(c => c.id === currentCastId);
+  if (!cast) return;
+  if (!cast.storeProfiles) cast.storeProfiles = {};
+
+  const activeStores = STORES.filter(s =>
+    s.key !== 'サクラムーン' && cast.storeProfiles[s.key]?.active
+  );
+  if (activeStores.length === 0) {
+    showToast('⚠️ 在籍店舗が他にありません');
+    return;
+  }
+
+  const overlay = document.createElement('div');
+  overlay.id = 'bulk-modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center';
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'background:#fff;border-radius:20px;padding:24px;width:380px;max-height:90vh;overflow-y:auto;font-family:inherit';
+
+  const storeRows = activeStores.map(s => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0f0">
+      <span style="font-size:14px;font-weight:700;color:#333">${s.label}（${s.key}）</span>
+      <input type="checkbox" id="bulk-chk-${s.key}" checked style="width:18px;height:18px;cursor:pointer">
+    </div>`).join('');
+
+  // 全て選択／全て解除のミニリンク（対象は selector で指定）
+  const selectAllRow = (selector) => `
+    <div style="display:flex;gap:12px;margin:2px 0 8px;padding-left:2px">
+      <button type="button" onclick="bulkSetChecked('${selector}', true)" style="font-size:11px;color:var(--pink);background:none;border:none;cursor:pointer;padding:0;font-family:inherit;text-decoration:underline">全て選択</button>
+      <button type="button" onclick="bulkSetChecked('${selector}', false)" style="font-size:11px;color:#999;background:none;border:none;cursor:pointer;padding:0;font-family:inherit;text-decoration:underline">全て解除</button>
+    </div>`;
+
+  // ④ 基本情報・オプション可否はアコーディオンで項目単位に選択
+  const basicItemRows = BULK_BASIC_ITEMS.map(({field,label}) => `
+    <label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer">
+      <input type="checkbox" class="bulk-basic-chk bulk-content-chk" data-field="${field}" checked style="width:15px;height:15px;cursor:pointer">
+      <span style="font-size:12px;color:#333">${label}</span>
+    </label>`).join('');
+
+  const optItemRows = Object.entries(OPT_LABEL_MAP).map(([key,label]) => `
+    <label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer">
+      <input type="checkbox" class="bulk-opt-chk bulk-content-chk" data-key="${esc(key)}" checked style="width:15px;height:15px;cursor:pointer">
+      <span style="font-size:12px;color:#333">${label}</span>
+    </label>`).join('');
+
+  const textFieldRows = BULK_TEXT_FIELDS.map(({field,label}) => `
+    <label style="display:flex;align-items:center;gap:8px;padding:8px 0;cursor:pointer;border-bottom:1px solid #f0f0f0">
+      <input type="checkbox" id="bulk-field-${field}" class="bulk-content-chk" checked style="width:16px;height:16px;cursor:pointer">
+      <span style="font-size:13px;color:#333">${label}</span>
+    </label>`).join('');
+
+  const srcComment    = getField(cast, 'サクラムーン', 'comment');
+  const srcMgrComment = getField(cast, 'サクラムーン', 'mgrComment');
+
+  modal.innerHTML = `
+    <div style="font-size:16px;font-weight:800;color:#333;margin-bottom:8px">📋 サクラムーンから一括反映</div>
+    <div style="font-size:12px;color:#e44;margin-bottom:12px">※バックは反映されません</div>
+
+    <details style="margin-bottom:10px" open>
+      <summary style="cursor:pointer;font-size:13px;font-weight:700;color:#333;padding:6px 0">📋 基本情報（クリックで開閉）</summary>
+      ${selectAllRow('.bulk-basic-chk')}
+      <div style="padding:2px 4px 4px 8px">${basicItemRows}</div>
+    </details>
+
+    <details style="margin-bottom:12px">
+      <summary style="cursor:pointer;font-size:13px;font-weight:700;color:#333;padding:6px 0">✅ オプション可否（クリックで開閉）</summary>
+      ${selectAllRow('.bulk-opt-chk')}
+      <div style="padding:2px 4px 4px 8px">${optItemRows}</div>
+    </details>
+
+    <div style="margin-bottom:12px">${textFieldRows}</div>
+
+    <div style="font-size:11px;font-weight:700;color:#888;margin-bottom:4px">反映先の店舗</div>
+    <div style="padding:0 4px">${storeRows}</div>
+    <div style="margin-top:16px">
+      <div style="font-size:11px;color:#888;margin-bottom:6px">プレビュー（サクラムーンの現在の内容）</div>
+      <div style="background:#f8f8f8;border-radius:10px;padding:10px;font-size:12px;color:#555;max-height:100px;overflow-y:auto;line-height:1.6">
+        <b>一言：</b>${(srcComment||'（未入力）').substring(0,60)}...<br>
+        <b>店長：</b>${(srcMgrComment||'（未入力）').substring(0,60)}...
+      </div>
+    </div>
+
+    <div style="margin-top:16px;padding-top:12px;border-top:1px solid #f0f0f0">
+      ${selectAllRow('.bulk-content-chk')}
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="executeBulkCopy()" style="
+        flex:1;padding:12px;border-radius:12px;border:none;
+        background:linear-gradient(135deg,#FF6B9D,#FF8FAB);
+        color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit
+      ">一括反映する</button>
+      <button onclick="document.getElementById('bulk-modal-overlay').remove()" style="
+        flex:1;padding:12px;border-radius:12px;border:1.5px solid #ddd;
+        background:#fff;color:#666;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit
+      ">キャンセル</button>
+    </div>`;
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
+// 一括反映モーダル内のチェックボックスをまとめてON/OFFする（全て選択・全て解除用）
+function bulkSetChecked(selector, checked) {
+  document.querySelectorAll(selector).forEach(chk => { chk.checked = checked; });
+}
+
+function executeBulkCopy() {
+  const cast = casts.find(c => c.id === currentCastId);
+  if (!cast) return;
+  if (!cast.storeProfiles) cast.storeProfiles = {};
+
+  // チェックされた基本情報項目
+  const targetFields = [];
+  document.querySelectorAll('.bulk-basic-chk:checked').forEach(chk => targetFields.push(chk.dataset.field));
+
+  // チェックされたオプション項目
+  const targetOptKeys = [];
+  document.querySelectorAll('.bulk-opt-chk:checked').forEach(chk => targetOptKeys.push(chk.dataset.key));
+
+  // チェックされたテキスト項目（一言・店長コメント・内勤）
+  BULK_TEXT_FIELDS.forEach(({field}) => {
+    const chk = document.getElementById('bulk-field-' + field);
+    if (chk && chk.checked) targetFields.push(field);
+  });
+
+  if (targetFields.length === 0 && targetOptKeys.length === 0) {
+    showToast('⚠️ 反映する項目を選択してください');
+    return;
+  }
+
+  const srcOptions = getStoreOptions(cast, 'サクラムーン');
+
+  let count = 0;
+  STORES.filter(s => s.key !== 'サクラムーン').forEach(s => {
+    const chk = document.getElementById('bulk-chk-' + s.key);
+    if (!chk || !chk.checked) return;
+    targetFields.forEach(field => {
+      setField(cast, s.key, field, getField(cast, 'サクラムーン', field));
+    });
+    targetOptKeys.forEach(key => {
+      setStoreOption(cast, s.key, key, srcOptions.options[key] || '');
+      if (srcOptions.optMemo[key] !== undefined) setStoreOptionMemo(cast, s.key, key, srcOptions.optMemo[key]);
+    });
+    count++;
+  });
+
+  saveCastsCache();
+  renderSidebar();
+  document.getElementById('bulk-modal-overlay').remove();
+  showToast(`✅ ${count}店舗に反映しました`);
+}
+
 function switchTab(tab) {
   currentTab = tab;
   const cast = casts.find(c => c.id === currentCastId);
   renderAnswerTab(cast);
+  // バックタブはrenderAnswerTab内のbackTabKeyに合わせて切り替え
+  if (tab === 'back') {
+    const storeKey = currentStoreTab || 'サクラムーン';
+    const backKey = STORE_TO_BACK[storeKey] || 'サクラナ';
+    switchBackTab(backKey);
+  }
+}
+
+// 店舗タブ切り替え後のバックタブ連動（renderAnswerTab後に呼ぶ）
+function syncBackTabToStore() {
+  const storeKey = currentStoreTab || 'サクラムーン';
+  const backKey = STORE_TO_BACK[storeKey] || 'サクラナ';
+  switchBackTab(backKey);
 }
 
 // =========================================================
@@ -2545,23 +3053,27 @@ function applyToAnswer() {
 // =========================================================
 function copyCompleted() {
   const cast = casts.find(c => c.id === currentCastId);
-  if (!cast?.generatedCastComment) return;
+  if (!cast) return;
+  const storeKey = currentStoreTab || 'サクラムーン';
+  const storeComment    = getField(cast, storeKey, 'comment');
+  const storeMgrComment = getField(cast, storeKey, 'mgrComment');
+  if (!storeComment) return;
   const okOpts   = OPT_ALL.filter(o => ['◎','○'].includes(cast.options?.[o]));
   const sankOpts = OPT_ALL.filter(o => cast.options?.[o] === '△');
   const ngOpts   = OPT_ALL.filter(o => cast.options?.[o] === '×');
   const text =
-`【${cast.name}】
-${cast.age}歳 / ${cast.size} / Pサイズ：${cast.psize}
-状態（竿/玉）：${cast.state} / 髪の毛：${cast.hair}
-性格：${cast.personality} / 趣味：${cast.hobby}
-チャームポイント：${cast.charm} / タバコ：${cast.tabako}
-性感帯：${cast.erogenous} / 得意技：${cast.skill}
+`【${getField(cast, storeKey, 'name')}】
+${getField(cast, storeKey, 'age')}歳 / ${getField(cast, storeKey, 'size')} / Pサイズ：${getField(cast, storeKey, 'psize')}
+状態（竿/玉）：${getField(cast, storeKey, 'state')} / 髪の毛：${getField(cast, storeKey, 'hair')}
+性格：${getField(cast, storeKey, 'personality')} / 趣味：${getField(cast, storeKey, 'hobby')}
+チャームポイント：${getField(cast, storeKey, 'charm')} / タバコ：${getField(cast, storeKey, 'tabako')}
+性感帯：${getField(cast, storeKey, 'erogenous')} / 得意技：${getField(cast, storeKey, 'skill')}
 
 ■ 本人から一言
-${cast.generatedCastComment}
+${storeComment}
 
 ■ 店長から一言
-${cast.generatedManagerComment}
+${storeMgrComment}
 
 ■ オプション
 OK：${okOpts.join(' / ')}
@@ -2685,6 +3197,9 @@ function addManualCast() {
     status: 'draft',
     colorIdx: casts.length % AVATAR_COLORS.length
   };
+  // サクラムーン店舗プロフとして初期化
+  newCast.storeProfiles = { 'サクラムーン': { active: true } };
+  STORE_PROFILE_FIELDS.forEach(f => setField(newCast, 'サクラムーン', f, newCast[f]));
   casts.push(newCast);
   saveCastsCache();
   closeModal();
@@ -2883,14 +3398,16 @@ async function loadFromGAS() {
           const keepCastCom  = casts[idx].generatedCastComment    || c.generatedCastComment    || '';
           const keepMgrCom   = casts[idx].generatedManagerComment || c.generatedManagerComment || '';
           // backData・honshimeiはGAS側を優先（GASに中身があればGASを使う）
-          const gasBackData  = c.backData  && Object.keys(c.backData).length  > 0 ? c.backData  : (casts[idx].backData  || {});
-          const gasHonshimei = c.honshimei && Object.keys(c.honshimei).length > 0 ? c.honshimei : (casts[idx].honshimei || {});
+          const gasBackData     = c.backData      && Object.keys(c.backData).length      > 0 ? c.backData      : (casts[idx].backData      || {});
+          const gasHonshimei   = c.honshimei    && Object.keys(c.honshimei).length    > 0 ? c.honshimei    : (casts[idx].honshimei    || {});
+          const gasStoreProf   = c.storeProfiles && Object.keys(c.storeProfiles).length > 0 ? c.storeProfiles : (casts[idx].storeProfiles || {});
           casts[idx] = { ...casts[idx], ...c };
           casts[idx].status                  = keepStatus;
           casts[idx].generatedCastComment    = keepCastCom;
           casts[idx].generatedManagerComment = keepMgrCom;
           casts[idx].backData                = gasBackData;
           casts[idx].honshimei               = gasHonshimei;
+          casts[idx].storeProfiles           = gasStoreProf;
         } else {
           c.status = c.status || 'new';
           casts.push(c);
