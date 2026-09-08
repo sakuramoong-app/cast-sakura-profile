@@ -671,6 +671,8 @@ let currentStoreTab = 'サクラムーン';
 let sidebarMode = 'active'; // 'active'（在籍キャスト） | 'retired'（退店キャスト）
 let logFilter   = '全て';   // 記録・ログパネルの絞り込み種別
 let hotelList   = [];       // エリア別ホテル一覧マスタ（内勤側で登録） [{hotelId, area, hotelName, mapUrl, note}, ...]
+let backPanelOpen  = false; // 💴バック設定パネルの開閉状態（再描画をまたいで保持）
+let hotelPanelOpen = false; // 🏨エリア別ホテル情報パネルの開閉状態（再描画をまたいで保持）
 
 // 記録・ログの種別定義（面接日・入店日・退店日もこのログに統一して記録する）
 const LOG_TYPES = [
@@ -914,6 +916,8 @@ function selectCast(id) {
   currentTab = 'answer';
   currentStoreTab = 'サクラムーン';
   generatedText = '';
+  backPanelOpen = false;
+  hotelPanelOpen = false;
   renderSidebar();
   const cast = casts.find(c => c.id === id);
   if (!cast) return;
@@ -1257,14 +1261,14 @@ function renderAnswerTab(cast) {
 
     <div class="panel" id="panel-back">
       <div class="panel-header" onclick="toggleBackPanel()" style="cursor:pointer">
-        <div class="panel-title"><span id="back-panel-arrow" style="display:inline-block;margin-right:4px;font-size:11px;color:var(--text2);transition:transform .15s">▶</span>💴 バック設定</div>
+        <div class="panel-title"><span id="back-panel-arrow" style="display:inline-block;margin-right:4px;font-size:11px;color:var(--text2);transition:transform .15s;transform:${backPanelOpen ? 'rotate(90deg)' : 'rotate(0deg)'}">▶</span>💴 バック設定</div>
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap" onclick="event.stopPropagation()">
           <span id="badge-back" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:var(--yellow-soft);color:#9a7000">${(cast.backData && Object.keys(cast.backData).length > 0) ? '設定済' : '未設定'}</span>
           <span style="font-size:11px;color:var(--text2)">表示中：${STORE_LABEL_MAP[storeKey] || storeKey} のバック</span>
           ${storeKey !== 'サクラムーン' && STORE_TO_BACK[storeKey] === 'サクラナ' ? '<span style="font-size:11px;background:#e8f4e8;color:#1a6640;padding:3px 8px;border-radius:6px;font-weight:700">サクラナバック共通</span>' : ''}
         </div>
       </div>
-      <div class="panel-body" id="back-panel-body" style="display:none">
+      <div class="panel-body" id="back-panel-body" style="display:${backPanelOpen ? 'block' : 'none'}">
 
         <!-- 本指名加算設定 -->
         <div style="background:var(--lav-soft);border:1.5px solid #c8b0f0;border-radius:12px;padding:12px 14px;margin-bottom:12px">
@@ -2040,55 +2044,133 @@ async function confirmRetire() {
 }
 
 // =========================================================
-//  エリア別ホテル情報（内勤側で登録したマスタ一覧から好み/NGを選択）
+//  エリア別ホテル情報
+//  - storeStatus（店舗としてのOK/NG）：内勤側でホテル一覧管理から設定、デフォルトで全キャストに適用される
+//  - cast.hotelPrefs（キャスト個別のOK/NG）：storeStatusを上書きするキャストごとの個別設定。両者は別データ
+//  - tags：自由入力・編集可能なタグ（例：3POK／駐車場あり／要注意）。エリア・タグで絞り込み可能
 // =========================================================
+
+let hotelFilter = { area: '', tags: [] }; // ホテル情報パネル・管理モーダル共通の絞り込み状態
+
+function allHotelAreas() {
+  return [...new Set(hotelList.map(h => h.area))].sort((a, b) => a.localeCompare(b, 'ja'));
+}
+function allHotelTags() {
+  const set = new Set();
+  hotelList.forEach(h => (h.tags || []).forEach(t => set.add(t)));
+  return [...set].sort((a, b) => a.localeCompare(b, 'ja'));
+}
+function matchesHotelFilter(h) {
+  if (hotelFilter.area && h.area !== hotelFilter.area) return false;
+  if (hotelFilter.tags.length && !hotelFilter.tags.every(t => (h.tags || []).includes(t))) return false;
+  return true;
+}
+function rerenderHotelViews() {
+  if (document.getElementById('hotel-modal')) renderHotelModalBody();
+  const cast = casts.find(c => c.id === currentCastId);
+  if (cast && document.getElementById('panel-hotel')) renderAnswerTab(cast);
+}
+function setHotelFilterArea(area) {
+  hotelFilter.area = area;
+  rerenderHotelViews();
+}
+function toggleHotelFilterTag(tag) {
+  const i = hotelFilter.tags.indexOf(tag);
+  if (i >= 0) hotelFilter.tags.splice(i, 1); else hotelFilter.tags.push(tag);
+  rerenderHotelViews();
+}
+function clearHotelFilter() {
+  hotelFilter = { area: '', tags: [] };
+  rerenderHotelViews();
+}
+
+function renderHotelFilterBar() {
+  const areas = allHotelAreas();
+  const tags  = allHotelTags();
+  if (!areas.length) return '';
+  const areaOptions = areas.map(a => `<option value="${esc(a)}" ${hotelFilter.area === a ? 'selected' : ''}>${esc(a)}</option>`).join('');
+  const tagChips = tags.map(t => {
+    const active = hotelFilter.tags.includes(t);
+    return `<button onclick="toggleHotelFilterTag('${esc(t).replace(/'/g, "\\'")}')" style="padding:4px 10px;border-radius:14px;font-size:11px;font-weight:700;border:1.5px solid ${active ? 'var(--pink)' : 'var(--border)'};background:${active ? 'var(--pink)' : '#fff'};color:${active ? '#fff' : 'var(--text2)'};cursor:pointer;font-family:inherit;white-space:nowrap">${esc(t)}</button>`;
+  }).join('');
+  return `
+    <div style="background:#f8f5fb;border-radius:10px;padding:10px 12px;margin-bottom:12px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:${tags.length ? '8px' : '0'}">
+        <span style="font-size:11px;color:var(--text2)">🔍 エリア</span>
+        <select onchange="setHotelFilterArea(this.value)" style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:5px 8px;font-size:12px;font-family:inherit;outline:none">
+          <option value="">すべて</option>
+          ${areaOptions}
+        </select>
+        ${(hotelFilter.area || hotelFilter.tags.length) ? `<button onclick="clearHotelFilter()" style="background:none;border:none;color:var(--pink);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;text-decoration:underline">絞り込みを解除</button>` : ''}
+      </div>
+      ${tags.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap">${tagChips}</div>` : ''}
+    </div>`;
+}
+
 function renderHotelPanel(cast) {
   const prefs = cast.hotelPrefs || { ok: [], ng: [] };
 
-  if (!hotelList.length) {
-    return `
-    <div class="panel" id="panel-hotel">
-      <div class="panel-header">
-        <div class="panel-title">🏨 エリア別ホテル情報</div>
-        <button onclick="openHotelListManager()" style="background:var(--pink-soft);border:1.5px solid var(--pink-mid);border-radius:10px;padding:5px 12px;font-size:12px;font-weight:700;color:var(--pink);cursor:pointer;font-family:inherit;transition:all .2s">＋ ホテルを登録</button>
-      </div>
-      <div class="panel-body">
-        <div style="text-align:center;color:var(--text2);font-size:13px;padding:20px 0">まだホテルが登録されていません。「＋ ホテルを登録」からエリアとホテルを追加してください。</div>
-      </div>
-    </div>`;
-  }
-
-  const areas = [...new Set(hotelList.map(h => h.area))];
-  const groups = areas.map(area => {
-    const hotels = hotelList.filter(h => h.area === area);
-    const chips = hotels.map(h => {
-      const state = prefs.ok.includes(h.hotelId) ? 'ok' : prefs.ng.includes(h.hotelId) ? 'ng' : null;
-      const style = state === 'ok'
-        ? 'background:#e6faf2;border-color:var(--mint);color:#1a6640'
-        : state === 'ng'
-          ? 'background:#ffe8ec;border-color:#FF5A7A;color:#c0304a'
-          : 'background:#fff;border-color:var(--border);color:var(--text2)';
-      const mark = state === 'ok' ? '◎ ' : state === 'ng' ? '✕ ' : '';
-      return `<button onclick="cycleHotelPref('${h.hotelId}')" style="padding:6px 12px;border-radius:20px;font-size:12px;font-weight:700;border:1.5px solid;cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .15s;${style}">${mark}${esc(h.hotelName)}</button>`;
+  const bodyInner = (() => {
+    if (!hotelList.length) {
+      return `<div style="text-align:center;color:var(--text2);font-size:13px;padding:20px 0">まだホテルが登録されていません。「⚙️ ホテル一覧を管理」からエリアとホテルを追加してください。</div>`;
+    }
+    const filtered = hotelList.filter(matchesHotelFilter);
+    const areas = [...new Set(filtered.map(h => h.area))];
+    if (!areas.length) {
+      return renderHotelFilterBar() + `<div style="text-align:center;color:var(--text2);font-size:13px;padding:16px 0">条件に一致するホテルがありません</div>`;
+    }
+    const groups = areas.map(area => {
+      const hotels = filtered.filter(h => h.area === area);
+      const chips = hotels.map(h => {
+        const castState  = prefs.ok.includes(h.hotelId) ? 'ok' : prefs.ng.includes(h.hotelId) ? 'ng' : null;
+        const storeState  = h.storeStatus === 'ok' ? 'ok' : h.storeStatus === 'ng' ? 'ng' : null;
+        const effective   = castState || storeState; // キャスト個別設定を優先、無ければ店舗デフォルトを継承
+        const inherited   = !castState && !!storeState;
+        let style, mark;
+        if (effective === 'ok') {
+          style = inherited ? 'background:#f2fbf7;border-color:var(--mint);border-style:dashed;color:#1a6640' : 'background:#e6faf2;border-color:var(--mint);color:#1a6640';
+          mark = '◎ ';
+        } else if (effective === 'ng') {
+          style = inherited ? 'background:#fff5f7;border-color:#FF5A7A;border-style:dashed;color:#c0304a' : 'background:#ffe8ec;border-color:#FF5A7A;color:#c0304a';
+          mark = '✕ ';
+        } else {
+          style = 'background:#fff;border-color:var(--border);color:var(--text2)';
+          mark = '';
+        }
+        const badge = inherited ? `<span style="font-size:9px;opacity:.8">（店舗共通）</span>` : '';
+        const tagLine = h.tags?.length ? `<span style="display:block;font-size:10px;font-weight:400;opacity:.75;margin-top:2px">${h.tags.map(t => esc(t)).join(' / ')}</span>` : '';
+        return `<button onclick="cycleHotelPref('${h.hotelId}')" style="text-align:left;padding:6px 12px;border-radius:14px;font-size:12px;font-weight:700;border:1.5px solid;cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .15s;${style}">${mark}${esc(h.hotelName)} ${badge}${tagLine}</button>`;
+      }).join('');
+      return `
+        <details style="margin-bottom:8px">
+          <summary style="cursor:pointer;font-size:11px;font-weight:700;color:var(--text2);padding:4px 0">📍 ${esc(area)}（${hotels.length}件）</summary>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;padding:6px 2px 4px">${chips}</div>
+        </details>`;
     }).join('');
     return `
-      <div style="margin-bottom:12px">
-        <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">📍 ${esc(area)}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>
-      </div>`;
-  }).join('');
+      <div style="font-size:11px;color:var(--text2);margin-bottom:10px">クリックで 未設定 → 好み(◎) → NG(✕) → 未設定 と切り替わります（点線＝店舗共通のデフォルト設定を継承中）</div>
+      ${renderHotelFilterBar()}
+      ${groups}`;
+  })();
 
   return `
     <div class="panel" id="panel-hotel">
-      <div class="panel-header">
-        <div class="panel-title">🏨 エリア別ホテル情報</div>
-        <button onclick="openHotelListManager()" style="background:var(--pink-soft);border:1.5px solid var(--pink-mid);border-radius:10px;padding:5px 12px;font-size:12px;font-weight:700;color:var(--pink);cursor:pointer;font-family:inherit;transition:all .2s">⚙️ ホテル一覧を管理</button>
+      <div class="panel-header" onclick="toggleHotelPanel()" style="cursor:pointer">
+        <div class="panel-title"><span id="hotel-panel-arrow" style="display:inline-block;margin-right:4px;font-size:11px;color:var(--text2);transition:transform .15s;transform:${hotelPanelOpen ? 'rotate(90deg)' : 'rotate(0deg)'}">▶</span>🏨 エリア別ホテル情報</div>
+        <button onclick="event.stopPropagation();openHotelListManager()" style="background:var(--pink-soft);border:1.5px solid var(--pink-mid);border-radius:10px;padding:5px 12px;font-size:12px;font-weight:700;color:var(--pink);cursor:pointer;font-family:inherit;transition:all .2s">⚙️ ホテル一覧を管理</button>
       </div>
-      <div class="panel-body">
-        <div style="font-size:11px;color:var(--text2);margin-bottom:12px">クリックで 未設定 → 好み(◎) → NG(✕) → 未設定 と切り替わります</div>
-        ${groups}
+      <div class="panel-body" id="hotel-panel-body" style="display:${hotelPanelOpen ? 'block' : 'none'}">
+        ${bodyInner}
       </div>
     </div>`;
+}
+
+function toggleHotelPanel() {
+  hotelPanelOpen = !hotelPanelOpen;
+  const body  = document.getElementById('hotel-panel-body');
+  const arrow = document.getElementById('hotel-panel-arrow');
+  if (body) body.style.display = hotelPanelOpen ? 'block' : 'none';
+  if (arrow) arrow.style.transform = hotelPanelOpen ? 'rotate(90deg)' : 'rotate(0deg)';
 }
 
 function cycleHotelPref(hotelId) {
@@ -2108,48 +2190,85 @@ function cycleHotelPref(hotelId) {
   renderAnswerTab(cast);
 }
 
+// ---- 店舗としてのOK/NG・タグ・備考の管理（内勤専用モーダル） ----
+
 function openHotelListManager() {
   const overlay = document.createElement('div');
   overlay.id = 'hotel-modal-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
 
   const modal = document.createElement('div');
   modal.id = 'hotel-modal';
-  modal.style.cssText = 'background:#fff;border-radius:20px;padding:24px;width:400px;max-height:90vh;overflow-y:auto;font-family:inherit';
+  modal.style.cssText = 'background:#fff;border-radius:20px;padding:24px;width:460px;max-width:100%;max-height:90vh;overflow-y:auto;font-family:inherit';
 
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
   renderHotelModalBody();
 }
 
+function renderHotelEditRow(h) {
+  const store = h.storeStatus === 'ok' ? 'ok' : h.storeStatus === 'ng' ? 'ng' : null;
+  const storeLabel = store === 'ok' ? '🏢◎ 店舗OK' : store === 'ng' ? '🏢✕ 店舗NG' : '🏢 店舗未設定';
+  const storeStyle = store === 'ok' ? 'background:#e6faf2;border-color:var(--mint);color:#1a6640'
+    : store === 'ng' ? 'background:#ffe8ec;border-color:#FF5A7A;color:#c0304a'
+    : 'background:#fff;border-color:var(--border);color:var(--text2)';
+  const tagChips = (h.tags || []).map(t => `
+    <span style="display:inline-flex;align-items:center;gap:3px;background:#fff;border:1px solid var(--border);border-radius:12px;padding:2px 4px 2px 9px;font-size:10px;color:var(--text2)">
+      ${esc(t)}
+      <button onclick="removeTagFromHotel('${h.hotelId}','${esc(t).replace(/'/g, "\\'")}')" style="background:none;border:none;color:#c0304a;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;padding:0 3px">×</button>
+    </span>`).join('');
+  const suggestTags = allHotelTags().filter(t => !(h.tags || []).includes(t));
+  const suggestChips = suggestTags.map(t => `
+    <button onclick="addTagToHotel('${h.hotelId}','${esc(t).replace(/'/g, "\\'")}')" style="background:#f5f0ff;border:1px dashed #c8b0f0;border-radius:12px;padding:2px 8px;font-size:10px;color:#7040bb;cursor:pointer;font-family:inherit">＋${esc(t)}</button>`).join('');
+
+  return `
+    <div style="background:var(--pink-bg);border-radius:10px;padding:10px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px">
+        <span style="font-size:13px;font-weight:700;color:var(--text)">${esc(h.hotelName)}</span>
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          <button onclick="cycleStoreStatus('${h.hotelId}')" style="padding:3px 8px;border-radius:8px;font-size:10px;font-weight:700;border:1.5px solid;cursor:pointer;font-family:inherit;white-space:nowrap;${storeStyle}">${storeLabel}</button>
+          <button onclick="deleteHotelEntry('${h.hotelId}')" style="background:none;border:none;color:#c0304a;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">削除</button>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${tagChips}${suggestChips}</div>
+      <div style="display:flex;gap:4px;margin-bottom:6px">
+        <input type="text" id="tag-input-${h.hotelId}" placeholder="新しいタグを追加" style="flex:1;background:#fff;border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px;font-family:inherit;outline:none" onkeydown="if(event.key==='Enter'){event.preventDefault();addTagFromInput('${h.hotelId}')}">
+        <button onclick="addTagFromInput('${h.hotelId}')" style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;color:var(--text2);cursor:pointer;font-family:inherit">追加</button>
+      </div>
+      <textarea onchange="updateHotelNote('${h.hotelId}', this.value)" placeholder="備考（3P料金・注意事項など）" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:11px;color:var(--text);font-family:inherit;outline:none;resize:vertical;min-height:34px">${esc(h.note || '')}</textarea>
+    </div>`;
+}
+
 function renderHotelModalBody() {
   const modal = document.getElementById('hotel-modal');
   if (!modal) return;
-  const areas = [...new Set(hotelList.map(h => h.area))];
+
+  const filtered = hotelList.filter(matchesHotelFilter);
+  const areas = [...new Set(filtered.map(h => h.area))];
   const groupsHtml = areas.length ? areas.map(area => {
-    const hotels = hotelList.filter(h => h.area === area);
-    const rows = hotels.map(h => `
-      <div style="display:flex;align-items:center;justify-content:space-between;background:var(--pink-bg);border-radius:8px;padding:6px 10px;margin-bottom:4px">
-        <span style="font-size:13px;color:var(--text)">${esc(h.hotelName)}</span>
-        <button onclick="deleteHotelEntry('${h.hotelId}')" style="background:none;border:none;color:#c0304a;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">削除</button>
-      </div>`).join('');
+    const hotels = filtered.filter(h => h.area === area);
+    const rows = hotels.map(h => renderHotelEditRow(h)).join('');
     return `
-      <div style="margin-bottom:14px">
-        <div style="font-size:12px;font-weight:700;color:var(--pink);margin-bottom:6px">📍 ${esc(area)}</div>
-        ${rows}
-      </div>`;
-  }).join('') : `<div style="text-align:center;color:var(--text2);font-size:13px;padding:16px 0">まだ登録されていません</div>`;
+      <details style="margin-bottom:10px" open>
+        <summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--pink);padding:6px 0">📍 ${esc(area)}（${hotels.length}件）</summary>
+        <div style="padding:2px 2px 4px">${rows}</div>
+      </details>`;
+  }).join('') : `<div style="text-align:center;color:var(--text2);font-size:13px;padding:16px 0">${hotelList.length ? '条件に一致するホテルがありません' : 'まだ登録されていません'}</div>`;
 
   modal.innerHTML = `
     <div style="font-size:16px;font-weight:800;color:#333;margin-bottom:6px">🏨 エリア別ホテル一覧の管理</div>
-    <div style="font-size:12px;color:#888;margin-bottom:16px">ここで登録したホテルが、各キャストのプロフ画面で「好み／NG」を選べる一覧になります</div>
+    <div style="font-size:12px;color:#888;margin-bottom:14px">🏢の店舗OK/NGは、キャストが個別に設定していない限りデフォルトで全キャストに適用されます</div>
 
-    <div style="max-height:280px;overflow-y:auto;margin-bottom:16px;padding-right:4px">${groupsHtml}</div>
+    ${renderHotelFilterBar()}
+
+    <div style="max-height:320px;overflow-y:auto;margin-bottom:16px;padding-right:4px">${groupsHtml}</div>
 
     <div style="background:var(--lav-soft);border-radius:10px;padding:12px;margin-bottom:16px">
       <div style="font-size:12px;font-weight:700;color:#5020aa;margin-bottom:8px">＋ ホテルを追加</div>
       <input type="text" id="new-hotel-area" placeholder="エリア名（例：鶯谷）" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none;margin-bottom:6px">
-      <input type="text" id="new-hotel-name" placeholder="ホテル名" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none;margin-bottom:8px">
+      <input type="text" id="new-hotel-name" placeholder="ホテル名" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none;margin-bottom:6px">
+      <input type="text" id="new-hotel-tags" placeholder="タグ（カンマ区切り　例：3POK,駐車場あり）" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none;margin-bottom:6px">
+      <textarea id="new-hotel-note" placeholder="備考（3P料金・注意事項など）" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;font-family:inherit;outline:none;resize:vertical;min-height:44px;margin-bottom:8px"></textarea>
       <button onclick="addHotelEntry()" style="width:100%;background:linear-gradient(135deg,#B7A6FF,#9B7EF0);border:none;border-radius:10px;padding:9px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit">追加する</button>
     </div>
 
@@ -2157,14 +2276,76 @@ function renderHotelModalBody() {
   `;
 }
 
+async function pushHotelUpdate(h) {
+  try {
+    const form = new FormData();
+    form.append('payload', JSON.stringify({
+      _type: 'updateHotel',
+      _token: generateGasToken(),
+      hotelId: h.hotelId, area: h.area, hotelName: h.hotelName,
+      tags: h.tags || [], storeStatus: h.storeStatus || '', note: h.note || '',
+    }));
+    await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: form });
+  } catch (e) { console.warn('ホテル更新エラー:', e); }
+}
+
+function addTagFromInput(hotelId) {
+  const input = document.getElementById('tag-input-' + hotelId);
+  if (!input) return;
+  const tag = input.value.trim();
+  if (!tag) return;
+  input.value = '';
+  addTagToHotel(hotelId, tag);
+}
+
+function addTagToHotel(hotelId, tag) {
+  tag = (tag || '').trim();
+  if (!tag) return;
+  const h = hotelList.find(x => x.hotelId === hotelId);
+  if (!h) return;
+  if (!h.tags) h.tags = [];
+  if (!h.tags.includes(tag)) h.tags.push(tag);
+  renderHotelModalBody();
+  rerenderHotelViews();
+  pushHotelUpdate(h);
+}
+
+function removeTagFromHotel(hotelId, tag) {
+  const h = hotelList.find(x => x.hotelId === hotelId);
+  if (!h) return;
+  h.tags = (h.tags || []).filter(t => t !== tag);
+  renderHotelModalBody();
+  rerenderHotelViews();
+  pushHotelUpdate(h);
+}
+
+function updateHotelNote(hotelId, note) {
+  const h = hotelList.find(x => x.hotelId === hotelId);
+  if (!h) return;
+  h.note = note;
+  pushHotelUpdate(h);
+}
+
+async function cycleStoreStatus(hotelId) {
+  const h = hotelList.find(x => x.hotelId === hotelId);
+  if (!h) return;
+  h.storeStatus = (!h.storeStatus) ? 'ok' : h.storeStatus === 'ok' ? 'ng' : '';
+  renderHotelModalBody();
+  rerenderHotelViews();
+  await pushHotelUpdate(h);
+}
+
 async function addHotelEntry() {
   const area = document.getElementById('new-hotel-area')?.value?.trim();
   const name = document.getElementById('new-hotel-name')?.value?.trim();
+  const tagsRaw = document.getElementById('new-hotel-tags')?.value || '';
+  const note = document.getElementById('new-hotel-note')?.value?.trim() || '';
   if (!area || !name) { showToast('⚠️ エリア名とホテル名を入力してください'); return; }
+  const tags = tagsRaw.split(/[,、]/).map(t => t.trim()).filter(Boolean);
 
   // IDはクライアント側で発番してそのままサーバーに保存する（キャスト側の好み/NGがこのIDを参照するため）
   const hotelId = 'H-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
-  hotelList.push({ hotelId, area, hotelName: name, mapUrl: '', note: '' });
+  hotelList.push({ hotelId, area, hotelName: name, tags, storeStatus: '', note, mapUrl: '' });
   renderHotelModalBody();
   showToast('🏨 ホテルを追加しました');
   const cast = casts.find(c => c.id === currentCastId);
@@ -2175,7 +2356,7 @@ async function addHotelEntry() {
     form.append('payload', JSON.stringify({
       _type: 'addHotel',
       _token: generateGasToken(),
-      hotelId, area, hotelName: name,
+      hotelId, area, hotelName: name, tags, storeStatus: '', note,
     }));
     await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: form });
   } catch (e) { console.warn('ホテル追加エラー:', e); }
@@ -2760,12 +2941,11 @@ function jumpToPanel(id) {
 }
 
 function toggleBackPanel() {
+  backPanelOpen = !backPanelOpen;
   const body  = document.getElementById('back-panel-body');
   const arrow = document.getElementById('back-panel-arrow');
-  if (!body) return;
-  const opening = body.style.display === 'none';
-  body.style.display = opening ? 'block' : 'none';
-  if (arrow) arrow.style.transform = opening ? 'rotate(90deg)' : 'rotate(0deg)';
+  if (body) body.style.display = backPanelOpen ? 'block' : 'none';
+  if (arrow) arrow.style.transform = backPanelOpen ? 'rotate(90deg)' : 'rotate(0deg)';
 }
 
 function switchBackTab(course) {
@@ -3968,7 +4148,12 @@ async function loadFromGAS() {
         const hotelsRes  = await fetch(`${GAS_URL}?action=getHotels`);
         const hotelsData = await hotelsRes.json();
         if (hotelsData.result === 'ok') {
-          hotelList = hotelsData.hotels || [];
+          // 旧バージョンのgas_prof.gs（tags/storeStatus未対応）から取得した場合も壊れないよう既定値で補う
+          hotelList = (hotelsData.hotels || []).map(h => ({
+            hotelId: h.hotelId, area: h.area || '', hotelName: h.hotelName || '',
+            tags: Array.isArray(h.tags) ? h.tags : [], storeStatus: h.storeStatus || '',
+            note: h.note || '', mapUrl: h.mapUrl || '',
+          }));
         }
       } catch (e) { console.warn('ホテル一覧取得エラー:', e); }
 
