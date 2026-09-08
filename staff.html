@@ -670,7 +670,11 @@ let currentTab = 'answer';
 let currentStoreTab = 'サクラムーン';
 let sidebarMode = 'active'; // 'active'（在籍キャスト） | 'retired'（退店キャスト）
 let logFilter   = '全て';   // 記録・ログパネルの絞り込み種別
-let hotelList   = [];       // エリア別ホテル一覧マスタ（内勤側で登録） [{hotelId, area, hotelName, mapUrl, note}, ...]
+let hotelList   = [];       // エリア別ホテル一覧マスタ（内勤側で登録） [{hotelId, area, hotelName, tags, storeStatus, note, mapUrl}, ...]
+let hotelMeta   = { areas: [], tags: [] }; // エリア名・タグの「よく使う語彙」マスタ（ホテル本体とは別データ、ワンクリック選択用）
+let newHotelDraft  = { area: '', tags: [] }; // 「＋ホテルを追加」フォームで選択中のエリア・タグ（送信前の一時状態）
+let areaAddFormOpen = false; // 「＋ エリアを追加」の入力欄を表示中か
+let tagAddFormOpen  = false; // 「＋ タグを追加」の入力欄を表示中か
 let backPanelOpen  = false; // 💴バック設定パネルの開閉状態（再描画をまたいで保持）
 let hotelPanelOpen = false; // 🏨エリア別ホテル情報パネルの開閉状態（再描画をまたいで保持）
 
@@ -2060,6 +2064,14 @@ function allHotelTags() {
   hotelList.forEach(h => (h.tags || []).forEach(t => set.add(t)));
   return [...set].sort((a, b) => a.localeCompare(b, 'ja'));
 }
+// 「よく使う語彙」マスタ（hotelMeta）＋実際に使われているエリア/タグ（hotelListから抽出）を統合した一覧。
+// 事前登録しておいたエリア/タグも、まだどのホテルにも使われていない段階から選択肢として表示できる
+function knownHotelAreas() {
+  return [...new Set([...(hotelMeta.areas || []), ...allHotelAreas()])].sort((a, b) => a.localeCompare(b, 'ja'));
+}
+function knownHotelTags() {
+  return [...new Set([...(hotelMeta.tags || []), ...allHotelTags()])].sort((a, b) => a.localeCompare(b, 'ja'));
+}
 function matchesHotelFilter(h) {
   if (hotelFilter.area && h.area !== hotelFilter.area) return false;
   if (hotelFilter.tags.length && !hotelFilter.tags.every(t => (h.tags || []).includes(t))) return false;
@@ -2085,8 +2097,8 @@ function clearHotelFilter() {
 }
 
 function renderHotelFilterBar() {
-  const areas = allHotelAreas();
-  const tags  = allHotelTags();
+  const areas = knownHotelAreas();
+  const tags  = knownHotelTags();
   if (!areas.length) return '';
   const areaOptions = areas.map(a => `<option value="${esc(a)}" ${hotelFilter.area === a ? 'selected' : ''}>${esc(a)}</option>`).join('');
   const tagChips = tags.map(t => {
@@ -2193,6 +2205,10 @@ function cycleHotelPref(hotelId) {
 // ---- 店舗としてのOK/NG・タグ・備考の管理（内勤専用モーダル） ----
 
 function openHotelListManager() {
+  newHotelDraft = { area: '', tags: [] };
+  areaAddFormOpen = false;
+  tagAddFormOpen = false;
+
   const overlay = document.createElement('div');
   overlay.id = 'hotel-modal-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
@@ -2217,7 +2233,7 @@ function renderHotelEditRow(h) {
       ${esc(t)}
       <button onclick="removeTagFromHotel('${h.hotelId}','${esc(t).replace(/'/g, "\\'")}')" style="background:none;border:none;color:#c0304a;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;padding:0 3px">×</button>
     </span>`).join('');
-  const suggestTags = allHotelTags().filter(t => !(h.tags || []).includes(t));
+  const suggestTags = knownHotelTags().filter(t => !(h.tags || []).includes(t));
   const suggestChips = suggestTags.map(t => `
     <button onclick="addTagToHotel('${h.hotelId}','${esc(t).replace(/'/g, "\\'")}')" style="background:#f5f0ff;border:1px dashed #c8b0f0;border-radius:12px;padding:2px 8px;font-size:10px;color:#7040bb;cursor:pointer;font-family:inherit">＋${esc(t)}</button>`).join('');
 
@@ -2263,17 +2279,122 @@ function renderHotelModalBody() {
 
     <div style="max-height:320px;overflow-y:auto;margin-bottom:16px;padding-right:4px">${groupsHtml}</div>
 
-    <div style="background:var(--lav-soft);border-radius:10px;padding:12px;margin-bottom:16px">
-      <div style="font-size:12px;font-weight:700;color:#5020aa;margin-bottom:8px">＋ ホテルを追加</div>
-      <input type="text" id="new-hotel-area" placeholder="エリア名（例：鶯谷）" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none;margin-bottom:6px">
-      <input type="text" id="new-hotel-name" placeholder="ホテル名" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none;margin-bottom:6px">
-      <input type="text" id="new-hotel-tags" placeholder="タグ（カンマ区切り　例：3POK,駐車場あり）" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none;margin-bottom:6px">
-      <textarea id="new-hotel-note" placeholder="備考（3P料金・注意事項など）" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;font-family:inherit;outline:none;resize:vertical;min-height:44px;margin-bottom:8px"></textarea>
-      <button onclick="addHotelEntry()" style="width:100%;background:linear-gradient(135deg,#B7A6FF,#9B7EF0);border:none;border-radius:10px;padding:9px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit">追加する</button>
-    </div>
+    ${renderHotelAddForm()}
 
     <button onclick="document.getElementById('hotel-modal-overlay').remove()" style="width:100%;padding:12px;border-radius:12px;border:1.5px solid #ddd;background:#fff;color:#666;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">閉じる</button>
   `;
+}
+
+// ＋ホテルを追加フォーム：エリア名 → タグ → ホテル名 → 備考の順。
+// エリア・タグは「よく使う語彙」から押すだけで選べ、その場で新しい語彙を追加・保存することもできる
+function renderHotelAddForm() {
+  const areas = knownHotelAreas();
+  const tags  = knownHotelTags();
+
+  const areaChips = areas.map(a => {
+    const active = newHotelDraft.area === a;
+    return `<button onclick="selectDraftArea('${esc(a).replace(/'/g, "\\'")}')" style="padding:5px 12px;border-radius:14px;font-size:12px;font-weight:700;border:1.5px solid ${active ? 'var(--pink)' : 'var(--border)'};background:${active ? 'var(--pink)' : '#fff'};color:${active ? '#fff' : 'var(--text2)'};cursor:pointer;font-family:inherit;white-space:nowrap">${esc(a)}</button>`;
+  }).join('');
+
+  const tagChips = tags.map(t => {
+    const active = newHotelDraft.tags.includes(t);
+    return `<button onclick="toggleDraftTag('${esc(t).replace(/'/g, "\\'")}')" style="padding:5px 12px;border-radius:14px;font-size:12px;font-weight:700;border:1.5px solid ${active ? '#7040bb' : 'var(--border)'};background:${active ? '#7040bb' : '#fff'};color:${active ? '#fff' : 'var(--text2)'};cursor:pointer;font-family:inherit;white-space:nowrap">${esc(t)}</button>`;
+  }).join('');
+
+  return `
+    <div style="background:var(--lav-soft);border-radius:10px;padding:12px;margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;color:#5020aa;margin-bottom:10px">＋ ホテルを追加</div>
+
+      <div style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:11px;color:var(--text2);font-weight:700">📍 エリア名</span>
+          <button onclick="toggleAreaAddForm()" style="background:none;border:none;color:#7040bb;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">＋ エリアを追加</button>
+        </div>
+        ${areas.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${areaChips}</div>` : `<div style="font-size:11px;color:var(--text2)">まだエリアがありません。「＋ エリアを追加」から登録してください</div>`}
+        ${areaAddFormOpen ? `
+        <div style="display:flex;gap:4px;margin-top:6px">
+          <input type="text" id="new-area-input" placeholder="新しいエリア名" style="flex:1;background:#fff;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit;outline:none" onkeydown="if(event.key==='Enter'){event.preventDefault();submitNewAreaMeta()}">
+          <button onclick="submitNewAreaMeta()" style="background:#7040bb;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit">保存</button>
+        </div>` : ''}
+      </div>
+
+      <div style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:11px;color:var(--text2);font-weight:700">🏷️ タグ</span>
+          <button onclick="toggleTagAddForm()" style="background:none;border:none;color:#7040bb;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">＋ タグを追加</button>
+        </div>
+        ${tags.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${tagChips}</div>` : `<div style="font-size:11px;color:var(--text2)">まだタグがありません。「＋ タグを追加」から登録してください</div>`}
+        ${tagAddFormOpen ? `
+        <div style="display:flex;gap:4px;margin-top:6px">
+          <input type="text" id="new-tag-input" placeholder="新しいタグ名（例：3POK）" style="flex:1;background:#fff;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit;outline:none" onkeydown="if(event.key==='Enter'){event.preventDefault();submitNewTagMeta()}">
+          <button onclick="submitNewTagMeta()" style="background:#7040bb;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit">保存</button>
+        </div>` : ''}
+      </div>
+
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;color:var(--text2);font-weight:700;margin-bottom:6px">🏨 ホテル名</div>
+        <input type="text" id="new-hotel-name" placeholder="ホテル名" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none">
+      </div>
+
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;color:var(--text2);font-weight:700;margin-bottom:6px">📝 備考</div>
+        <textarea id="new-hotel-note" placeholder="備考（3P料金・注意事項など）" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;font-family:inherit;outline:none;resize:vertical;min-height:44px"></textarea>
+      </div>
+
+      <button onclick="addHotelEntry()" style="width:100%;background:linear-gradient(135deg,#B7A6FF,#9B7EF0);border:none;border-radius:10px;padding:9px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit">追加する</button>
+    </div>`;
+}
+
+function selectDraftArea(area) {
+  newHotelDraft.area = area;
+  renderHotelModalBody();
+}
+function toggleDraftTag(tag) {
+  const i = newHotelDraft.tags.indexOf(tag);
+  if (i >= 0) newHotelDraft.tags.splice(i, 1); else newHotelDraft.tags.push(tag);
+  renderHotelModalBody();
+}
+function toggleAreaAddForm() {
+  areaAddFormOpen = !areaAddFormOpen;
+  renderHotelModalBody();
+}
+function toggleTagAddForm() {
+  tagAddFormOpen = !tagAddFormOpen;
+  renderHotelModalBody();
+}
+
+async function pushHotelMeta(kind, value) {
+  try {
+    const form = new FormData();
+    form.append('payload', JSON.stringify({
+      _type: 'addHotelMeta',
+      _token: generateGasToken(),
+      kind, value,
+    }));
+    await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: form });
+  } catch (e) { console.warn('タグ/エリア登録エラー:', e); }
+}
+
+async function submitNewAreaMeta() {
+  const input = document.getElementById('new-area-input');
+  const value = input?.value?.trim();
+  if (!value) return;
+  if (!hotelMeta.areas.includes(value)) hotelMeta.areas.push(value);
+  newHotelDraft.area = value;
+  areaAddFormOpen = false;
+  renderHotelModalBody();
+  await pushHotelMeta('area', value);
+}
+
+async function submitNewTagMeta() {
+  const input = document.getElementById('new-tag-input');
+  const value = input?.value?.trim();
+  if (!value) return;
+  if (!hotelMeta.tags.includes(value)) hotelMeta.tags.push(value);
+  if (!newHotelDraft.tags.includes(value)) newHotelDraft.tags.push(value);
+  tagAddFormOpen = false;
+  renderHotelModalBody();
+  await pushHotelMeta('tag', value);
 }
 
 async function pushHotelUpdate(h) {
@@ -2336,16 +2457,21 @@ async function cycleStoreStatus(hotelId) {
 }
 
 async function addHotelEntry() {
-  const area = document.getElementById('new-hotel-area')?.value?.trim();
+  const area = newHotelDraft.area;
   const name = document.getElementById('new-hotel-name')?.value?.trim();
-  const tagsRaw = document.getElementById('new-hotel-tags')?.value || '';
   const note = document.getElementById('new-hotel-note')?.value?.trim() || '';
-  if (!area || !name) { showToast('⚠️ エリア名とホテル名を入力してください'); return; }
-  const tags = tagsRaw.split(/[,、]/).map(t => t.trim()).filter(Boolean);
+  const tags = newHotelDraft.tags.slice();
+  if (!area) { showToast('⚠️ エリアを選択、または「＋ エリアを追加」から登録してください'); return; }
+  if (!name) { showToast('⚠️ ホテル名を入力してください'); return; }
 
   // IDはクライアント側で発番してそのままサーバーに保存する（キャスト側の好み/NGがこのIDを参照するため）
   const hotelId = 'H-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
   hotelList.push({ hotelId, area, hotelName: name, tags, storeStatus: '', note, mapUrl: '' });
+  if (!hotelMeta.areas.includes(area)) hotelMeta.areas.push(area);
+  tags.forEach(t => { if (!hotelMeta.tags.includes(t)) hotelMeta.tags.push(t); });
+
+  // 次のホテルも同じエリアで続けて登録しやすいよう、エリアは維持しつつタグ・ホテル名・備考だけリセットする
+  newHotelDraft = { area, tags: [] };
   renderHotelModalBody();
   showToast('🏨 ホテルを追加しました');
   const cast = casts.find(c => c.id === currentCastId);
@@ -4156,6 +4282,15 @@ async function loadFromGAS() {
           }));
         }
       } catch (e) { console.warn('ホテル一覧取得エラー:', e); }
+
+      // エリア名・タグの「よく使う語彙」マスタを取得
+      try {
+        const metaRes  = await fetch(`${GAS_URL}?action=getHotelMeta`);
+        const metaData = await metaRes.json();
+        if (metaData.result === 'ok') {
+          hotelMeta = { areas: metaData.areas || [], tags: metaData.tags || [] };
+        }
+      } catch (e) { console.warn('ホテル分類取得エラー:', e); }
 
       if (data.serverTime) {
         localStorage.setItem('sakuraMoon_lastSync', data.serverTime);
