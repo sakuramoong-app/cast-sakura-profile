@@ -2120,7 +2120,9 @@ function renderHotelFilterBar() {
 }
 
 function renderHotelPanel(cast) {
-  const prefs = cast.hotelPrefs || { ok: [], ng: [] };
+  const prefs = cast.hotelPrefs || { ok: [], ng: [], conditional: [], memo: {} };
+  if (!prefs.conditional) prefs.conditional = [];
+  if (!prefs.memo) prefs.memo = {};
 
   const bodyInner = (() => {
     if (!hotelList.length) {
@@ -2134,14 +2136,17 @@ function renderHotelPanel(cast) {
     const groups = areas.map(area => {
       const hotels = filtered.filter(h => h.area === area);
       const chips = hotels.map(h => {
-        const castState  = prefs.ok.includes(h.hotelId) ? 'ok' : prefs.ng.includes(h.hotelId) ? 'ng' : null;
+        const castState  = prefs.ok.includes(h.hotelId) ? 'ok' : prefs.conditional.includes(h.hotelId) ? 'conditional' : prefs.ng.includes(h.hotelId) ? 'ng' : null;
         const storeState  = h.storeStatus === 'ok' ? 'ok' : h.storeStatus === 'ng' ? 'ng' : null;
-        const effective   = castState || storeState; // キャスト個別設定を優先、無ければ店舗デフォルトを継承
+        const effective   = castState || storeState; // キャスト個別設定（店舗一覧管理には影響しない）を優先、無ければ店舗デフォルトを継承
         const inherited   = !castState && !!storeState;
         let style, mark;
         if (effective === 'ok') {
           style = inherited ? 'background:#f2fbf7;border-color:var(--mint);border-style:dashed;color:#1a6640' : 'background:#e6faf2;border-color:var(--mint);color:#1a6640';
           mark = '◎ ';
+        } else if (effective === 'conditional') {
+          style = 'background:#fff8e6;border-color:#e0a72c;color:#8a6300';
+          mark = '△ ';
         } else if (effective === 'ng') {
           style = inherited ? 'background:#fff5f7;border-color:#FF5A7A;border-style:dashed;color:#c0304a' : 'background:#ffe8ec;border-color:#FF5A7A;color:#c0304a';
           mark = '✕ ';
@@ -2151,7 +2156,15 @@ function renderHotelPanel(cast) {
         }
         const badge = inherited ? `<span style="font-size:9px;opacity:.8">（店舗共通）</span>` : '';
         const tagLine = h.tags?.length ? `<span style="display:block;font-size:10px;font-weight:400;opacity:.75;margin-top:2px">${h.tags.map(t => esc(t)).join(' / ')}</span>` : '';
-        return `<button onclick="cycleHotelPref('${h.hotelId}')" style="text-align:left;padding:6px 12px;border-radius:14px;font-size:12px;font-weight:700;border:1.5px solid;cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .15s;${style}">${mark}${esc(h.hotelName)} ${badge}${tagLine}</button>`;
+        const memoRow = (castState === 'conditional' || castState === 'ng') ? `
+          <div style="width:100%;margin:2px 0 2px" onclick="event.stopPropagation()">
+            <input type="text" value="${esc(prefs.memo[h.hotelId] || '')}" placeholder="条件・理由メモ（例：3名までならOK）" onchange="setHotelPrefMemo('${h.hotelId}', this.value)" style="width:100%;box-sizing:border-box;background:#fff;border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px;font-family:inherit;outline:none;color:var(--text)">
+          </div>` : '';
+        return `
+          <div style="display:flex;flex-wrap:wrap;align-items:flex-start;max-width:220px">
+            <button onclick="cycleHotelPref('${h.hotelId}')" style="text-align:left;padding:6px 12px;border-radius:14px;font-size:12px;font-weight:700;border:1.5px solid;cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .15s;${style}">${mark}${esc(h.hotelName)} ${badge}${tagLine}</button>
+            ${memoRow}
+          </div>`;
       }).join('');
       return `
         <details style="margin-bottom:8px">
@@ -2160,7 +2173,7 @@ function renderHotelPanel(cast) {
         </details>`;
     }).join('');
     return `
-      <div style="font-size:11px;color:var(--text2);margin-bottom:10px">クリックで 未設定 → 好み(◎) → NG(✕) → 未設定 と切り替わります（点線＝店舗共通のデフォルト設定を継承中）</div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:10px">クリックで 未設定 → 好み(◎) → 条件付き(△) → NG(✕) → 未設定 と切り替わります（点線＝店舗共通のデフォルト設定を継承中。△・✕には理由・条件メモを入力できます。ここでの設定はこのキャストのページだけに保存され、店舗のホテル一覧管理には反映されません）</div>
       ${renderHotelFilterBar()}
       ${groups}`;
   })();
@@ -2185,21 +2198,41 @@ function toggleHotelPanel() {
   if (arrow) arrow.style.transform = hotelPanelOpen ? 'rotate(90deg)' : 'rotate(0deg)';
 }
 
+// キャスト個別のホテル評価はこのページ内だけで完結する（店舗の一覧管理には反映されない）。
+// 未設定 → 好み(◎) → 条件付き(△) → NG(✕) → 未設定 の4段階をクリックで循環
 function cycleHotelPref(hotelId) {
   const cast = casts.find(c => c.id === currentCastId);
   if (!cast) return;
-  if (!cast.hotelPrefs) cast.hotelPrefs = { ok: [], ng: [] };
-  const isOk = cast.hotelPrefs.ok.includes(hotelId);
-  const isNg = cast.hotelPrefs.ng.includes(hotelId);
-  cast.hotelPrefs.ok = cast.hotelPrefs.ok.filter(id => id !== hotelId);
-  cast.hotelPrefs.ng = cast.hotelPrefs.ng.filter(id => id !== hotelId);
-  if (!isOk && !isNg) {
+  if (!cast.hotelPrefs) cast.hotelPrefs = { ok: [], ng: [], conditional: [], memo: {} };
+  if (!cast.hotelPrefs.conditional) cast.hotelPrefs.conditional = [];
+  if (!cast.hotelPrefs.memo) cast.hotelPrefs.memo = {};
+  const isOk   = cast.hotelPrefs.ok.includes(hotelId);
+  const isCond = cast.hotelPrefs.conditional.includes(hotelId);
+  const isNg   = cast.hotelPrefs.ng.includes(hotelId);
+  cast.hotelPrefs.ok          = cast.hotelPrefs.ok.filter(id => id !== hotelId);
+  cast.hotelPrefs.conditional = cast.hotelPrefs.conditional.filter(id => id !== hotelId);
+  cast.hotelPrefs.ng          = cast.hotelPrefs.ng.filter(id => id !== hotelId);
+  if (!isOk && !isCond && !isNg) {
     cast.hotelPrefs.ok.push(hotelId); // 未設定 → 好み
   } else if (isOk) {
-    cast.hotelPrefs.ng.push(hotelId); // 好み → NG
-  } // NG → 未設定（すでに両方から除去済み）
+    cast.hotelPrefs.conditional.push(hotelId); // 好み → 条件付き
+  } else if (isCond) {
+    cast.hotelPrefs.ng.push(hotelId); // 条件付き → NG
+  } // NG → 未設定（すでに全部から除去済み。メモは残しておき、次に△/NGにした時に再利用できるようにする）
   saveCastsCache();
   renderAnswerTab(cast);
+}
+
+// 条件付き(△)・NG(✕)の理由・条件メモを更新（キャスト個別。店舗側データには影響しない）
+function setHotelPrefMemo(hotelId, memoText) {
+  const cast = casts.find(c => c.id === currentCastId);
+  if (!cast) return;
+  if (!cast.hotelPrefs) cast.hotelPrefs = { ok: [], ng: [], conditional: [], memo: {} };
+  if (!cast.hotelPrefs.memo) cast.hotelPrefs.memo = {};
+  const trimmed = (memoText || '').trim();
+  if (trimmed) cast.hotelPrefs.memo[hotelId] = trimmed;
+  else delete cast.hotelPrefs.memo[hotelId];
+  saveCastsCache();
 }
 
 // ---- 店舗としてのOK/NG・タグ・備考の管理（内勤専用モーダル） ----
@@ -2493,8 +2526,10 @@ async function deleteHotelEntry(hotelId) {
   hotelList = hotelList.filter(h => h.hotelId !== hotelId);
   casts.forEach(c => {
     if (c.hotelPrefs) {
-      c.hotelPrefs.ok = (c.hotelPrefs.ok || []).filter(id => id !== hotelId);
-      c.hotelPrefs.ng = (c.hotelPrefs.ng || []).filter(id => id !== hotelId);
+      c.hotelPrefs.ok          = (c.hotelPrefs.ok || []).filter(id => id !== hotelId);
+      c.hotelPrefs.conditional = (c.hotelPrefs.conditional || []).filter(id => id !== hotelId);
+      c.hotelPrefs.ng          = (c.hotelPrefs.ng || []).filter(id => id !== hotelId);
+      if (c.hotelPrefs.memo) delete c.hotelPrefs.memo[hotelId];
     }
   });
   saveCastsCache();
@@ -2744,7 +2779,7 @@ function saveAllEdits() {
     interviewDate: cast.interviewDate || '',
     joinDate:      cast.joinDate      || '',
     joinReason:    cast.joinReason    || '',
-    hotelPrefs:    cast.hotelPrefs    || { ok: [], ng: [] },
+    hotelPrefs:    cast.hotelPrefs    || { ok: [], ng: [], conditional: [], memo: {} },
   }));
   fetch(GAS_URL, {
     method: 'POST',
@@ -4033,7 +4068,7 @@ function addManualCast() {
     interviewDate: '', joinDate: '', leaveDate: '',
     joinReason: '', leaveReason: '', retired: false,
     submittedAt: new Date().toISOString(), updatedAt: '', logs: [],
-    hotelPrefs: { ok: [], ng: [] },
+    hotelPrefs: { ok: [], ng: [], conditional: [], memo: {} },
   };
   // サクラムーン店舗プロフとして初期化
   newCast.storeProfiles = { 'サクラムーン': { active: true } };
@@ -4247,11 +4282,11 @@ async function loadFromGAS() {
           casts[idx].honshimei               = gasHonshimei;
           casts[idx].storeProfiles           = gasStoreProf;
           casts[idx].retired                 = c.retired === true || c.retired === 'TRUE' || c.retired === 'true';
-          casts[idx].hotelPrefs              = casts[idx].hotelPrefs || { ok: [], ng: [] };
+          casts[idx].hotelPrefs              = casts[idx].hotelPrefs || { ok: [], ng: [], conditional: [], memo: {} };
         } else {
           c.status  = c.status || 'new';
           c.retired = c.retired === true || c.retired === 'TRUE' || c.retired === 'true';
-          c.hotelPrefs = c.hotelPrefs || { ok: [], ng: [] };
+          c.hotelPrefs = c.hotelPrefs || { ok: [], ng: [], conditional: [], memo: {} };
           casts.push(c);
           newCount++;
         }
