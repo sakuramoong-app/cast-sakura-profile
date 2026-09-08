@@ -672,7 +672,8 @@ let sidebarMode = 'active'; // 'active'（在籍キャスト） | 'retired'（�
 let logFilter   = '全て';   // 記録・ログパネルの絞り込み種別
 let hotelList   = [];       // エリア別ホテル一覧マスタ（内勤側で登録） [{hotelId, area, hotelName, tags, storeStatus, note, mapUrl}, ...]
 let hotelMeta   = { areas: [], tags: [] }; // エリア名・タグの「よく使う語彙」マスタ（ホテル本体とは別データ、ワンクリック選択用）
-let newHotelDraft  = { area: '', tags: [] }; // 「＋ホテルを追加」フォームで選択中のエリア・タグ（送信前の一時状態）
+let newHotelDraft  = { area: '', tags: [], storeStatus: '' }; // 「＋ホテルを追加」フォームで選択中のエリア・タグ・店舗OK/NG（送信前の一時状態）
+let hotelAreaOpen  = {}; // エリア別ホテル情報パネル内、エリアごとの<details>開閉状態（キー=エリア名。再描画をまたいで保持）
 let areaAddFormOpen = false; // 「＋ エリアを追加」の入力欄を表示中か
 let tagAddFormOpen  = false; // 「＋ タグを追加」の入力欄を表示中か
 let backPanelOpen  = false; // 💴バック設定パネルの開閉状態（再描画をまたいで保持）
@@ -922,6 +923,7 @@ function selectCast(id) {
   generatedText = '';
   backPanelOpen = false;
   hotelPanelOpen = false;
+  hotelAreaOpen = {};
   renderSidebar();
   const cast = casts.find(c => c.id === id);
   if (!cast) return;
@@ -2166,8 +2168,9 @@ function renderHotelPanel(cast) {
             ${memoRow}
           </div>`;
       }).join('');
+      const areaKey = esc(area).replace(/'/g, "\\'");
       return `
-        <details style="margin-bottom:8px">
+        <details style="margin-bottom:8px" ${hotelAreaOpen[area] ? 'open' : ''} ontoggle="hotelAreaToggled('${areaKey}', this.open)">
           <summary style="cursor:pointer;font-size:11px;font-weight:700;color:var(--text2);padding:4px 0">📍 ${esc(area)}（${hotels.length}件）</summary>
           <div style="display:flex;flex-wrap:wrap;gap:6px;padding:6px 2px 4px">${chips}</div>
         </details>`;
@@ -2196,6 +2199,12 @@ function toggleHotelPanel() {
   const arrow = document.getElementById('hotel-panel-arrow');
   if (body) body.style.display = hotelPanelOpen ? 'block' : 'none';
   if (arrow) arrow.style.transform = hotelPanelOpen ? 'rotate(90deg)' : 'rotate(0deg)';
+}
+
+// エリアごとの<details>開閉状態を記録するだけ（cycleHotelPref等でrenderHotelPanelが再描画されても、
+// 開いていたエリアが勝手に閉じてしまわないようにするため）
+function hotelAreaToggled(area, isOpen) {
+  hotelAreaOpen[area] = isOpen;
 }
 
 // キャスト個別のホテル評価はこのページ内だけで完結する（店舗の一覧管理には反映されない）。
@@ -2238,7 +2247,7 @@ function setHotelPrefMemo(hotelId, memoText) {
 // ---- 店舗としてのOK/NG・タグ・備考の管理（内勤専用モーダル） ----
 
 function openHotelListManager() {
-  newHotelDraft = { area: '', tags: [] };
+  newHotelDraft = { area: '', tags: [], storeStatus: '' };
   areaAddFormOpen = false;
   tagAddFormOpen = false;
 
@@ -2364,6 +2373,11 @@ function renderHotelAddForm() {
         </div>` : ''}
       </div>
 
+      <div style="margin-bottom:12px">
+        <div style="font-size:11px;color:var(--text2);font-weight:700;margin-bottom:6px">🏢 店舗としてのOK/NG（あとから一覧の「店舗OK/NG」ボタンでも変更できます）</div>
+        <div style="display:flex;gap:6px">${renderDraftStoreStatusChips()}</div>
+      </div>
+
       <div style="margin-bottom:10px">
         <div style="font-size:11px;color:var(--text2);font-weight:700;margin-bottom:6px">🏨 ホテル名</div>
         <input type="text" id="new-hotel-name" placeholder="ホテル名" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none">
@@ -2376,6 +2390,27 @@ function renderHotelAddForm() {
 
       <button onclick="addHotelEntry()" style="width:100%;background:linear-gradient(135deg,#B7A6FF,#9B7EF0);border:none;border-radius:10px;padding:9px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit">追加する</button>
     </div>`;
+}
+
+// ホテル追加フォーム内の店舗OK/NG選択チップ（未設定/OK/NGの単一選択）
+function renderDraftStoreStatusChips() {
+  const options = [
+    { key: '',   label: '🏢 未設定' },
+    { key: 'ok', label: '🏢◎ OK' },
+    { key: 'ng', label: '🏢✕ NG' },
+  ];
+  return options.map(opt => {
+    const active = (newHotelDraft.storeStatus || '') === opt.key;
+    const activeStyle = opt.key === 'ok' ? 'background:#e6faf2;border-color:var(--mint);color:#1a6640'
+      : opt.key === 'ng' ? 'background:#ffe8ec;border-color:#FF5A7A;color:#c0304a'
+      : 'background:var(--lav-soft);border-color:var(--text2);color:var(--text2)';
+    const style = active ? activeStyle : 'background:#fff;border-color:var(--border);color:var(--text2)';
+    return `<button onclick="selectDraftStoreStatus('${opt.key}')" style="flex:1;padding:5px 8px;border-radius:8px;font-size:11px;font-weight:700;border:1.5px solid;cursor:pointer;font-family:inherit;white-space:nowrap;${style}">${opt.label}</button>`;
+  }).join('');
+}
+function selectDraftStoreStatus(status) {
+  newHotelDraft.storeStatus = status;
+  renderHotelModalBody();
 }
 
 function selectDraftArea(area) {
@@ -2494,17 +2529,18 @@ async function addHotelEntry() {
   const name = document.getElementById('new-hotel-name')?.value?.trim();
   const note = document.getElementById('new-hotel-note')?.value?.trim() || '';
   const tags = newHotelDraft.tags.slice();
+  const storeStatus = newHotelDraft.storeStatus || '';
   if (!area) { showToast('⚠️ エリアを選択、または「＋ エリアを追加」から登録してください'); return; }
   if (!name) { showToast('⚠️ ホテル名を入力してください'); return; }
 
   // IDはクライアント側で発番してそのままサーバーに保存する（キャスト側の好み/NGがこのIDを参照するため）
   const hotelId = 'H-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
-  hotelList.push({ hotelId, area, hotelName: name, tags, storeStatus: '', note, mapUrl: '' });
+  hotelList.push({ hotelId, area, hotelName: name, tags, storeStatus, note, mapUrl: '' });
   if (!hotelMeta.areas.includes(area)) hotelMeta.areas.push(area);
   tags.forEach(t => { if (!hotelMeta.tags.includes(t)) hotelMeta.tags.push(t); });
 
-  // 次のホテルも同じエリアで続けて登録しやすいよう、エリアは維持しつつタグ・ホテル名・備考だけリセットする
-  newHotelDraft = { area, tags: [] };
+  // 次のホテルも同じエリアで続けて登録しやすいよう、エリアは維持しつつタグ・店舗OK/NG・ホテル名・備考だけリセットする
+  newHotelDraft = { area, tags: [], storeStatus: '' };
   renderHotelModalBody();
   showToast('🏨 ホテルを追加しました');
   const cast = casts.find(c => c.id === currentCastId);
@@ -2515,7 +2551,7 @@ async function addHotelEntry() {
     form.append('payload', JSON.stringify({
       _type: 'addHotel',
       _token: generateGasToken(),
-      hotelId, area, hotelName: name, tags, storeStatus: '', note,
+      hotelId, area, hotelName: name, tags, storeStatus, note,
     }));
     await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: form });
   } catch (e) { console.warn('ホテル追加エラー:', e); }
