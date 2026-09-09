@@ -2128,7 +2128,7 @@ function renderHotelPanel(cast) {
 
   const bodyInner = (() => {
     if (!hotelList.length) {
-      return `<div style="text-align:center;color:var(--text2);font-size:13px;padding:20px 0">まだホテルが登録されていません。「⚙️ ホテル一覧を管理」からエリアとホテルを追加してください。</div>`;
+      return `<div style="text-align:center;color:var(--text2);font-size:13px;padding:20px 0">まだホテルが登録されていません。サイドバー左下の「🏨 ホテル一覧管理」からエリアとホテルを追加してください。</div>`;
     }
     const filtered = hotelList.filter(matchesHotelFilter);
     const areas = [...new Set(filtered.map(h => h.area))];
@@ -2185,7 +2185,6 @@ function renderHotelPanel(cast) {
     <div class="panel" id="panel-hotel">
       <div class="panel-header" onclick="toggleHotelPanel()" style="cursor:pointer">
         <div class="panel-title"><span id="hotel-panel-arrow" style="display:inline-block;margin-right:4px;font-size:11px;color:var(--text2);transition:transform .15s;transform:${hotelPanelOpen ? 'rotate(90deg)' : 'rotate(0deg)'}">▶</span>🏨 エリア別ホテル情報</div>
-        <button onclick="event.stopPropagation();openHotelListManager()" style="background:var(--pink-soft);border:1.5px solid var(--pink-mid);border-radius:10px;padding:5px 12px;font-size:12px;font-weight:700;color:var(--pink);cursor:pointer;font-family:inherit;transition:all .2s">⚙️ ホテル一覧を管理</button>
       </div>
       <div class="panel-body" id="hotel-panel-body" style="display:${hotelPanelOpen ? 'block' : 'none'}">
         ${bodyInner}
@@ -2257,7 +2256,7 @@ function openHotelListManager() {
 
   const modal = document.createElement('div');
   modal.id = 'hotel-modal';
-  modal.style.cssText = 'background:#fff;border-radius:20px;padding:24px;width:460px;max-width:100%;max-height:90vh;overflow-y:auto;font-family:inherit';
+  modal.style.cssText = 'background:#fff;border-radius:20px;padding:24px;width:min(1100px,95vw);max-height:92vh;overflow-y:auto;font-family:inherit';
 
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
@@ -2301,6 +2300,13 @@ function renderHotelModalBody() {
   const modal = document.getElementById('hotel-modal');
   if (!modal) return;
 
+  // モーダル全体、および内側のホテル一覧スクロール領域それぞれのスクロール位置を保存し、
+  // 再描画（innerHTML差し替え）後に復元する。店舗OK/NG切り替え等のクリックのたびに
+  // 一番上へ飛ばされてしまう不具合の対策
+  const modalScrollTop = modal.scrollTop;
+  const prevListWrap = document.getElementById('hotel-list-scroll');
+  const listScrollTop = prevListWrap ? prevListWrap.scrollTop : 0;
+
   const filtered = hotelList.filter(matchesHotelFilter);
   const areas = [...new Set(filtered.map(h => h.area))];
   const groupsHtml = areas.length ? areas.map(area => {
@@ -2309,7 +2315,7 @@ function renderHotelModalBody() {
     return `
       <details style="margin-bottom:10px" open>
         <summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--pink);padding:6px 0">📍 ${esc(area)}（${hotels.length}件）</summary>
-        <div style="padding:2px 2px 4px">${rows}</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;padding:2px 2px 4px">${rows}</div>
       </details>`;
   }).join('') : `<div style="text-align:center;color:var(--text2);font-size:13px;padding:16px 0">${hotelList.length ? '条件に一致するホテルがありません' : 'まだ登録されていません'}</div>`;
 
@@ -2319,12 +2325,16 @@ function renderHotelModalBody() {
 
     ${renderHotelFilterBar()}
 
-    <div style="max-height:320px;overflow-y:auto;margin-bottom:16px;padding-right:4px">${groupsHtml}</div>
+    <div id="hotel-list-scroll" style="max-height:58vh;overflow-y:auto;margin-bottom:16px;padding-right:4px">${groupsHtml}</div>
 
     ${renderHotelAddForm()}
 
     <button onclick="document.getElementById('hotel-modal-overlay').remove()" style="width:100%;padding:12px;border-radius:12px;border:1.5px solid #ddd;background:#fff;color:#666;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">閉じる</button>
   `;
+
+  modal.scrollTop = modalScrollTop;
+  const newListWrap = document.getElementById('hotel-list-scroll');
+  if (newListWrap) newListWrap.scrollTop = listScrollTop;
 }
 
 // ＋ホテルを追加フォーム：エリア名 → タグ → ホテル名 → 備考の順。
