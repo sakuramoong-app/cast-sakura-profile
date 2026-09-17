@@ -1058,7 +1058,8 @@ function buildPreview() {
     const text = ans ? (ans.choice === 'C' ? (ans.text || '（未記入）') : ans.text) : '（未回答）';
     pqLines += `  Q${q.n}：${text}\n`;
   });
-  const pqResult = computePersonalityResult();
+  // 集計結果（参考タイプ）はキャスト本人には見せない（内勤ページのみで確認できる想定）。
+  // 回答内容そのものは最終確認できるよう質問と回答のみプレビューに残す
 
   const text =
 `【基本情報】
@@ -1083,8 +1084,7 @@ ${vibes}
 ${comment}
 
 【かんたん性格タイプチェック】
-${pqLines}参考タイプ：${pqResult.typeCode}
-
+${pqLines}
 【内勤への連絡事項】
 ${internal}`;
 
