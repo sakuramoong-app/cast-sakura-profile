@@ -865,6 +865,27 @@ function updatePqProgress() {
   if (el) el.textContent = answered;
 }
 
+// 端末やブラウザによっては、戻る/進むの操作やページ復元時にラジオボタンの見た目（チェック状態）だけが
+// 復元され、onchangeイベントが発火せずpersonalityAnswersに反映されないケースがある。
+// 次へ進む直前に実際のDOMのチェック状態から必ず答えを再構築し、見た目と内部状態のズレによって
+// 「全部回答したのに次へ進めない」という不具合が起きないようにする（回答済みなのに反映漏れがある場合の保険）
+function syncPersonalityAnswersFromDom() {
+  PQ_QUESTIONS.forEach(q => {
+    const checked = document.querySelector(`input[name="pq-${q.n}"]:checked`);
+    if (!checked) return; // 本当に未回答なら何もしない（validateAndGo側で弾かれる）
+    const choice = checked.value;
+    const cur = personalityAnswers[q.n];
+    if (cur && cur.choice === choice) return; // 既に一致していれば何もしない（入力済みの自由記述を保持）
+    if (choice === 'A') personalityAnswers[q.n] = { choice:'A', text: q.a };
+    else if (choice === 'B') personalityAnswers[q.n] = { choice:'B', text: q.b };
+    else {
+      const freeVal = document.querySelector(`#pq-free-${q.n} textarea`)?.value || '';
+      personalityAnswers[q.n] = { choice:'C', text: freeVal };
+    }
+  });
+  updatePqProgress();
+}
+
 // A/B回答の集計から5軸（外向-内向・感覚-直観・思考-感情・判断-知覚・落ち着き）を判定する。
 // Cは自動判定に加点しない。同数の場合は判定なし（?）として内勤に個別確認してもらう
 function computePersonalityResult() {
@@ -970,6 +991,7 @@ function validateAndGo(next) {
   }
 
   if (cur === 4) {
+    syncPersonalityAnswersFromDom();
     ok = PQ_QUESTIONS.every(q => {
       const ans = personalityAnswers[q.n];
       if (!ans || !ans.choice) return false;
