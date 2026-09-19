@@ -368,6 +368,9 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
     <button class="add-cast-btn" onclick="openHotelListManager()" style="border-color:#B7A6FF;color:#5020aa">
       🏨 ホテル一覧管理
     </button>
+    <button class="add-cast-btn" onclick="openNotifyEmailSettings()" style="border-color:#7DA8D8;color:#1a4d8f">
+      📧 通知メール設定
+    </button>
     <button class="add-cast-btn" onclick="manualReload()" style="border-color:#7DD8B0;color:#1a6640">
       🔄 最新データに更新
     </button>
@@ -679,6 +682,7 @@ let tagAddFormOpen  = false; // 「＋ タグを追加」の入力欄を表示�
 let backPanelOpen  = false; // 💴バック設定パネルの開閉状態（再描画をまたいで保持）
 let hotelPanelOpen = false; // 🏨エリア別ホテル情報パネルの開閉状態（再描画をまたいで保持）
 let personalityPanelOpen = false; // 🧩性格タイプチェックパネルの開閉状態（再描画をまたいで保持）
+let notifyEmails = []; // キャストのプロフィール提出時に通知するメールアドレス一覧（内勤側で設定・PropertiesServiceに保存）
 
 // 記録・ログの種別定義（面接日・入店日・退店日もこのログに統一して記録する）
 const LOG_TYPES = [
@@ -2316,6 +2320,84 @@ function setHotelPrefMemo(hotelId, memoText) {
   if (trimmed) cast.hotelPrefs.memo[hotelId] = trimmed;
   else delete cast.hotelPrefs.memo[hotelId];
   saveCastsCache();
+}
+
+// ---- キャストのプロフィール提出時にメール通知する宛先の管理（内勤専用モーダル） ----
+// ホテル一覧管理の「よく使う語彙」と同じ考え方で、GAS側はPropertiesServiceにJSON配列として保存するだけの軽量な設定
+function openNotifyEmailSettings() {
+  const overlay = document.createElement('div');
+  overlay.id = 'notify-modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+
+  const modal = document.createElement('div');
+  modal.id = 'notify-modal';
+  modal.style.cssText = 'background:#fff;border-radius:20px;padding:24px;width:min(480px,95vw);max-height:85vh;overflow-y:auto;font-family:inherit';
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  renderNotifyEmailModalBody();
+}
+
+function renderNotifyEmailModalBody() {
+  const modal = document.getElementById('notify-modal');
+  if (!modal) return;
+
+  const chips = notifyEmails.length ? notifyEmails.map(email => `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--lav-soft);border-radius:10px;padding:8px 12px;margin-bottom:6px">
+      <span style="font-size:13px;color:var(--text);word-break:break-all">${esc(email)}</span>
+      <button onclick="removeNotifyEmailEntry('${esc(email).replace(/'/g, "\\'")}')" style="background:none;border:none;color:#c0304a;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0">削除</button>
+    </div>`).join('') : `<div style="text-align:center;color:var(--text2);font-size:13px;padding:16px 0">まだ通知先が登録されていません</div>`;
+
+  modal.innerHTML = `
+    <div style="font-size:16px;font-weight:800;color:#333;margin-bottom:6px">📧 通知メール設定</div>
+    <div style="font-size:12px;color:#888;margin-bottom:14px">キャストがプロフィールを提出（新規登録・更新）すると、ここに登録したメールアドレス宛に通知が届きます。複数登録できます。</div>
+
+    <div style="margin-bottom:12px">${chips}</div>
+
+    <div style="display:flex;gap:6px;margin-bottom:16px">
+      <input type="email" id="new-notify-email-input" placeholder="例：naikin@example.com" style="flex:1;background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;outline:none" onkeydown="if(event.key==='Enter'){event.preventDefault();addNotifyEmailEntry()}">
+      <button onclick="addNotifyEmailEntry()" style="background:var(--pink);border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;white-space:nowrap">追加</button>
+    </div>
+
+    <button onclick="document.getElementById('notify-modal-overlay').remove()" style="width:100%;padding:12px;border-radius:12px;border:1.5px solid #ddd;background:#fff;color:#666;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">閉じる</button>
+  `;
+}
+
+function addNotifyEmailEntry() {
+  const input = document.getElementById('new-notify-email-input');
+  const value = input?.value?.trim();
+  if (!value) return;
+  // ざっくりとした簡易チェックのみ（内勤が使う設定画面なので厳密なバリデーションはしない）
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+    showToast('⚠️ メールアドレスの形式を確認してください');
+    return;
+  }
+  if (notifyEmails.includes(value)) {
+    input.value = '';
+    return;
+  }
+  notifyEmails.push(value);
+  input.value = '';
+  renderNotifyEmailModalBody();
+  pushNotifyEmail('addNotifyEmail', value);
+}
+
+function removeNotifyEmailEntry(email) {
+  notifyEmails = notifyEmails.filter(e => e !== email);
+  renderNotifyEmailModalBody();
+  pushNotifyEmail('deleteNotifyEmail', email);
+}
+
+async function pushNotifyEmail(type, email) {
+  try {
+    const form = new FormData();
+    form.append('payload', JSON.stringify({
+      _type: type,
+      _token: generateGasToken(),
+      email,
+    }));
+    await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: form });
+  } catch (e) { console.warn('通知メール設定エラー:', e); }
 }
 
 // ---- 店舗としてのOK/NG・タグ・備考の管理（内勤専用モーダル） ----
@@ -4447,6 +4529,15 @@ async function loadFromGAS() {
           hotelMeta = { areas: metaData.areas || [], tags: metaData.tags || [] };
         }
       } catch (e) { console.warn('ホテル分類取得エラー:', e); }
+
+      // プロフィール提出時のメール通知先を取得
+      try {
+        const notifyRes  = await fetch(`${GAS_URL}?action=getNotifySettings`);
+        const notifyData = await notifyRes.json();
+        if (notifyData.result === 'ok') {
+          notifyEmails = notifyData.emails || [];
+        }
+      } catch (e) { console.warn('通知メール設定取得エラー:', e); }
 
       if (data.serverTime) {
         localStorage.setItem('sakuraMoon_lastSync', data.serverTime);
