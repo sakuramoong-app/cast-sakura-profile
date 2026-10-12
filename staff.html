@@ -914,7 +914,7 @@ function renderSidebar(filter) {
       <div class="cast-avatar" style="background:${AVATAR_COLORS[c.colorIdx % AVATAR_COLORS.length]}">${(name[0]||'?')}</div>
       <div class="cast-info">
         <div class="cast-name">${esc(name)}</div>
-        <div class="cast-meta">${esc(String(age))}歳 / ${esc(size ? size.split('-')[0] : '—')}${c.retired ? `　🚪${esc(c.leaveDate||'')}退店` : ''}</div>
+        <div class="cast-meta">${esc(String(age))}歳 / ${esc(size ? String(size).split('-')[0] : '—')}${c.retired ? `　🚪${esc(c.leaveDate||'')}退店` : ''}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
         <div class="cast-status ${statusClass}">${statusLabel}</div>
