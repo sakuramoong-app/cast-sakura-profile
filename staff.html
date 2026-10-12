@@ -298,6 +298,8 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
   .info-grid,.opt-wrap{grid-template-columns:1fr;}
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="prof_db.js"></script>
 </head>
 <body>
 
@@ -554,7 +556,7 @@ async function portalSsoLogin(sso) {
   showAuthScreen('⏳ ポータルから入っています…');
   try {
     // ※ 通行証は1回しか使えないので、失敗しても送り直さない
-    const res  = await fetch(GAS_URL, {
+    const res  = await profFetch(GAS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ _type: 'ssoLogin', ssoToken: sso.ssoToken, operator: sso.operator }),
@@ -574,14 +576,21 @@ async function portalSsoLogin(sso) {
   showAuthScreen('入れませんでした。ポータルからもう一度開いてください');
 }
 
-// 起動時：すでに入っていればそのまま開く／ポータルから来たら入館証をもらう／それ以外は案内だけ
+// 起動時（2026/10 Supabase に引っ越し）
+// ポータルと同じ場所にあるので、ポータルのログイン（20時間）をそのまま使う。
+// 通行証（#portalSso=…）はもう使わない（読んだら捨てる）。
 (function() {
-  const sso = takePortalSso();
-  document.addEventListener('DOMContentLoaded', () => {
+  takePortalSso();
+  document.addEventListener('DOMContentLoaded', async () => {
     // GAS_URL などの定数が揃ってから動かすため DOMContentLoaded で実行
-    if (loadProfSession()) showMainApp();
-    else if (sso) portalSsoLogin(sso);
-    else showAuthScreen();
+    const sbs = await ProfDB.getStaffSession();
+    if (!sbs) {
+      try { localStorage.removeItem(PROF_SESSION_KEY); } catch (e) {}
+      showAuthScreen();
+      return;
+    }
+    localStorage.setItem(PROF_SESSION_KEY, JSON.stringify({ token: 'supabase', expiresAt: ProfDB.sessionExpiresAt(sbs) }));
+    showMainApp();
   });
 })();
 
@@ -1814,16 +1823,29 @@ function renderLogPanel(cast) {
   );
   const filtered = logFilter === '全て' ? logs : logs.filter(l => l.type === logFilter);
 
-  const logRows = filtered.length ? filtered.map(l => `
-    <div style="background:var(--pink-bg);border-radius:10px;padding:10px 12px;margin-bottom:8px">
+  // 1件ずつ枠で囲み、書いた内勤の色（内勤カレンダーと同じ）を薄く背景に。名前は小さく・内容は大きく
+  const logRows = filtered.length ? filtered.map(l => {
+    const mk = staffMark(l.author);
+    const logKey = esc(String(l.logId || l.id || ''));
+    return `
+    <div id="logbox-${logKey}" style="background:${mk.bg};border:1px solid rgba(0,0,0,.06);border-left:5px solid ${mk.color};border-radius:10px;padding:9px 12px;margin-bottom:8px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;gap:8px">
-        <span style="font-size:12px;font-weight:700;color:var(--pink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(logTypeLabel(l.type))}</span>
-        <span style="font-size:11px;color:var(--text2);white-space:nowrap;flex-shrink:0">${esc(l.date || '')}</span>
+        <span style="font-size:11px;font-weight:700;color:var(--pink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(logTypeLabel(l.type))}</span>
+        <span style="font-size:10.5px;color:var(--text2);white-space:nowrap;flex-shrink:0">${esc(l.date || '')}</span>
       </div>
+      ${l.author ? `<div style="font-size:10.5px;font-weight:700;color:${mk.color};margin-bottom:3px">${mk.emoji} ${esc(l.author)}</div>` : ''}
       ${l.reservationDate ? `<div style="font-size:11px;color:var(--text2);margin-bottom:4px">予約日時：${esc(l.reservationDate)}</div>` : ''}
-      <div style="font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.6">${esc(l.content || '')}</div>
-    </div>
-  `).join('') : `<div style="text-align:center;color:var(--text2);font-size:13px;padding:20px 0">記録はまだありません</div>`;
+      <div class="log-view">
+        <div style="font-size:14px;color:var(--text);white-space:pre-wrap;line-height:1.6">${esc(l.content || '')}</div>
+        ${l.editedAt ? '<div style="font-size:10px;color:var(--text2);margin-top:2px">（編集済み）</div>' : ''}
+        ${logKey ? `<div style="margin-top:4px">
+          <button onclick="startEditLog('${logKey}')" style="border:none;background:none;color:#c9556a;font-size:11px;font-weight:700;padding:0;cursor:pointer;text-decoration:underline;font-family:inherit">編集</button>
+          <button onclick="deleteLog('${logKey}')" style="border:none;background:none;color:#d9534f;font-size:11px;font-weight:700;padding:0;margin-left:12px;cursor:pointer;text-decoration:underline;font-family:inherit">削除</button>
+        </div>` : ''}
+      </div>
+      <div class="log-edit" style="display:none"></div>
+    </div>`;
+  }).join('') : `<div style="text-align:center;color:var(--text2);font-size:13px;padding:20px 0">記録はまだありません</div>`;
 
   const filterBtns = ['全て', ...LOG_TYPES.map(t => t.key)].map(k => {
     const label  = k === '全て' ? '全て' : logTypeLabel(k);
@@ -1894,6 +1916,9 @@ function renderLogPanel(cast) {
             </select>
             <input type="date" id="newlog-date" value="${todayStr()}" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;outline:none">
           </div>
+          <select id="newlog-author" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;outline:none;margin-bottom:8px">
+            ${Object.keys(STAFF_MARKS).map(n => `<option value="${n}" ${n === currentOperatorName() ? 'selected' : ''}>${STAFF_MARKS[n].emoji} ${n}</option>`).join('')}
+          </select>
           <div id="newlog-reservation-wrap" style="display:none;margin-bottom:8px">
             <div style="font-size:11px;color:var(--text2);margin-bottom:4px">予約日時</div>
             <input type="datetime-local" id="newlog-reservation" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;outline:none">
@@ -1905,6 +1930,18 @@ function renderLogPanel(cast) {
     </div>
   `;
 }
+
+// 内勤ごとのマークと色（内勤カレンダー・在籍作成ルームと同じ）
+const STAFF_MARKS = {
+  'きゃ': { emoji: '🧡', color: '#e8590c', bg: '#fff4ee' },
+  'すや': { emoji: '💗', color: '#d6579e', bg: '#fff3fa' },
+  'らん': { emoji: '💙', color: '#4d96d9', bg: '#f1f7fe' },
+  'かみ': { emoji: '🌙', color: '#3b5bdb', bg: '#f0f3fe' },
+  'わか': { emoji: '🦉', color: '#8a6fd1', bg: '#f6f2fe' },
+};
+function staffMark(name) { return STAFF_MARKS[name] || { emoji: '🌸', color: '#c9556a', bg: '#FDF3F5' }; }
+// ポータルで選んでいる担当者
+function currentOperatorName() { try { return localStorage.getItem('currentOperator') || ''; } catch (e) { return ''; } }
 
 function setLogFilter(key) {
   logFilter = key;
@@ -1945,9 +1982,74 @@ async function postLogEntry(cast, entry) {
       date: entry.date || '',
       reservationDate: entry.reservationDate || '',
       content: entry.content || '',
+      author: entry.author || currentOperatorName(),
     }));
-    await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: form });
-  } catch (e) { console.warn('ログ保存エラー:', e); }
+    const res = await profFetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: form });
+    // 保存できたら、あとで編集・削除できるように記録の番号を覚えておく
+    const r = await res.json();
+    if (r && r.logId) { entry.logId = r.logId; saveCastsCache(); }
+    else showToast('⚠️ 記録を保存できませんでした。もう一度追加してください');
+  } catch (e) { console.warn('ログ保存エラー:', e); showToast('⚠️ 記録を保存できませんでした。もう一度追加してください'); }
+}
+
+/* ---------- 記録の編集・削除 ---------- */
+function findLog(logKey) {
+  const cast = casts.find(c => c.id === currentCastId);
+  const log = cast && (cast.logs || []).find(l => l.logId === logKey || l.id === logKey);
+  return { cast, log };
+}
+function startEditLog(logKey) {
+  const box = document.getElementById('logbox-' + logKey);
+  const { log } = findLog(logKey);
+  if (!box || !log) return;
+  if (!log.logId) { showToast('⏳ 保存中です。少し待ってからもう一度押してください'); return; }
+  box.querySelector('.log-view').style.display = 'none';
+  const ed = box.querySelector('.log-edit');
+  ed.style.display = 'block';
+  ed.innerHTML = `
+    <select class="log-edit-author" style="width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;outline:none;margin:4px 0 6px">
+      ${Object.keys(STAFF_MARKS).map(n => `<option value="${n}" ${n === log.author ? 'selected' : ''}>${STAFF_MARKS[n].emoji} ${n}</option>`).join('')}
+      ${log.author ? '' : '<option value="" selected>（内勤名なし）</option>'}
+    </select>
+    <textarea class="log-edit-text" style="width:100%;background:#fff;border:1.5px solid var(--pink);border-radius:8px;padding:8px 10px;font-size:14px;color:var(--text);font-family:inherit;outline:none;resize:vertical;min-height:70px">${esc(log.content || '')}</textarea>
+    <div style="display:flex;gap:6px;margin-top:6px">
+      <button onclick="saveEditLog('${logKey}')" style="flex:1;background:var(--pink);color:#fff;border:none;border-radius:99px;padding:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">保存</button>
+      <button onclick="renderAnswerTab(findLog('${logKey}').cast)" style="flex:1;background:#eee;color:var(--text2);border:none;border-radius:99px;padding:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">キャンセル</button>
+    </div>`;
+}
+async function saveEditLog(logKey) {
+  const box = document.getElementById('logbox-' + logKey);
+  const { cast, log } = findLog(logKey);
+  if (!box || !log) return;
+  const content = box.querySelector('.log-edit-text').value.trim();
+  const author = box.querySelector('.log-edit-author').value;
+  if (!content) { showToast('⚠️ 内容を入力してください'); return; }
+  const form = new FormData();
+  form.append('payload', JSON.stringify({ _type: 'updateLog', _token: generateGasToken(), logId: log.logId, content, author }));
+  try {
+    const r = await (await profFetch(GAS_URL, { method: 'POST', body: form })).json();
+    if (r.result !== 'ok') { showToast('⚠️ 保存できませんでした：' + (r.message || '')); return; }
+    log.content = content; log.author = author; log.editedAt = new Date().toISOString();
+    saveCastsCache();
+    showToast('✏️ 記録を直しました');
+    renderAnswerTab(cast);
+  } catch (e) { showToast('⚠️ 通信エラーが発生しました'); }
+}
+async function deleteLog(logKey) {
+  const { cast, log } = findLog(logKey);
+  if (!log) return;
+  if (!log.logId) { showToast('⏳ 保存中です。少し待ってからもう一度押してください'); return; }
+  if (!confirm('この記録を削除しますか？（元に戻せません）')) return;
+  const form = new FormData();
+  form.append('payload', JSON.stringify({ _type: 'deleteLog', _token: generateGasToken(), logId: log.logId }));
+  try {
+    const r = await (await profFetch(GAS_URL, { method: 'POST', body: form })).json();
+    if (r.result !== 'ok') { showToast('⚠️ 削除できませんでした：' + (r.message || '')); return; }
+    cast.logs = (cast.logs || []).filter(l => l !== log);
+    saveCastsCache();
+    showToast('🗑 記録を削除しました');
+    renderAnswerTab(cast);
+  } catch (e) { showToast('⚠️ 通信エラーが発生しました'); }
 }
 
 function submitNewLog() {
@@ -1963,6 +2065,7 @@ function submitNewLog() {
     id: 'local-' + Date.now(),
     type, date, content,
     reservationDate: type === 'クレーム_客' ? reservationDate : '',
+    author: document.getElementById('newlog-author')?.value || '',
     createdAt: new Date().toISOString(),
   };
   if (!cast.logs) cast.logs = [];
@@ -2049,7 +2152,7 @@ async function confirmRetire() {
       leaveReason:   cast.leaveReason,
       retired:       true,
     }));
-    await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: form });
+    await profFetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: form });
   } catch (e) { console.warn('退店処理の保存エラー:', e); }
   await postLogEntry(cast, entry);
 
@@ -2405,7 +2508,7 @@ async function pushNotifyEmail(type, email) {
       _token: generateGasToken(),
       email,
     }));
-    await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: form });
+    await profFetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: form });
   } catch (e) { console.warn('通知メール設定エラー:', e); }
 }
 
@@ -2615,7 +2718,7 @@ async function pushHotelMeta(kind, value) {
       _token: generateGasToken(),
       kind, value,
     }));
-    await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: form });
+    await profFetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: form });
   } catch (e) { console.warn('タグ/エリア登録エラー:', e); }
 }
 
@@ -2650,7 +2753,7 @@ async function pushHotelUpdate(h) {
       hotelId: h.hotelId, area: h.area, hotelName: h.hotelName,
       tags: h.tags || [], storeStatus: h.storeStatus || '', note: h.note || '',
     }));
-    await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: form });
+    await profFetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: form });
   } catch (e) { console.warn('ホテル更新エラー:', e); }
 }
 
@@ -2729,7 +2832,7 @@ async function addHotelEntry() {
       _token: generateGasToken(),
       hotelId, area, hotelName: name, tags, storeStatus, note,
     }));
-    await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: form });
+    await profFetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: form });
   } catch (e) { console.warn('ホテル追加エラー:', e); }
 }
 
@@ -2756,7 +2859,7 @@ async function deleteHotelEntry(hotelId) {
       _token: generateGasToken(),
       hotelId,
     }));
-    await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: form });
+    await profFetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: form });
   } catch (e) { console.warn('ホテル削除エラー:', e); }
 }
 
@@ -2993,7 +3096,7 @@ function saveAllEdits() {
     joinReason:    cast.joinReason    || '',
     hotelPrefs:    cast.hotelPrefs    || { ok: [], ng: [], conditional: [], memo: {} },
   }));
-  fetch(GAS_URL, {
+  profFetch(GAS_URL, {
     method: 'POST',
     mode: 'no-cors',
     body: confForm
@@ -4226,7 +4329,7 @@ function deleteCast(id) {
     name: cast.name,
     _token: generateGasToken()
   }));
-  fetch(GAS_URL, {
+  profFetch(GAS_URL, {
     method: 'POST',
     mode: 'no-cors',
     body: delForm
@@ -4460,7 +4563,7 @@ async function init() {
 async function loadFromGAS() {
   try {
     // 常に全件取得して削除済みを確実に除去する
-    const res  = await fetch(gasGetUrl('getCasts'));
+    const res  = await profFetch(gasGetUrl('getCasts'));
     const data = await res.json();
 
     if (data.result === 'error' && data.message === '認証エラー') {
@@ -4510,7 +4613,7 @@ async function loadFromGAS() {
 
       // 記録・ログ（面接日/入店日/退店日/ヒアリング/クレーム等）を別途取得してキャストごとに紐付け
       try {
-        const logsRes  = await fetch(gasGetUrl('getLogs'));
+        const logsRes  = await profFetch(gasGetUrl('getLogs'));
         const logsData = await logsRes.json();
         if (logsData.result === 'ok') {
           const allLogs = logsData.logs || [];
@@ -4522,7 +4625,7 @@ async function loadFromGAS() {
 
       // エリア別ホテル一覧（内勤側で登録したマスタリスト）を取得
       try {
-        const hotelsRes  = await fetch(gasGetUrl('getHotels'));
+        const hotelsRes  = await profFetch(gasGetUrl('getHotels'));
         const hotelsData = await hotelsRes.json();
         if (hotelsData.result === 'ok') {
           // 旧バージョンのgas_prof.gs（tags/storeStatus未対応）から取得した場合も壊れないよう既定値で補う
@@ -4536,7 +4639,7 @@ async function loadFromGAS() {
 
       // エリア名・タグの「よく使う語彙」マスタを取得
       try {
-        const metaRes  = await fetch(gasGetUrl('getHotelMeta'));
+        const metaRes  = await profFetch(gasGetUrl('getHotelMeta'));
         const metaData = await metaRes.json();
         if (metaData.result === 'ok') {
           hotelMeta = { areas: metaData.areas || [], tags: metaData.tags || [] };
@@ -4545,7 +4648,7 @@ async function loadFromGAS() {
 
       // プロフィール提出時のメール通知先を取得
       try {
-        const notifyRes  = await fetch(gasGetUrl('getNotifySettings'));
+        const notifyRes  = await profFetch(gasGetUrl('getNotifySettings'));
         const notifyData = await notifyRes.json();
         if (notifyData.result === 'ok') {
           notifyEmails = notifyData.emails || [];
@@ -4569,7 +4672,7 @@ async function loadFromGAS() {
 // GASへプロフ生成結果を反映
 async function saveGeneratedToGAS(cast) {
   try {
-    await fetch(GAS_URL, {
+    await profFetch(GAS_URL, {
       method: 'POST',
       mode:   'no-cors',
       headers: { 'Content-Type': 'application/json' },

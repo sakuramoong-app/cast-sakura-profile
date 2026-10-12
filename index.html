@@ -344,6 +344,9 @@ body::before{
 ::-webkit-scrollbar{width:4px;}
 ::-webkit-scrollbar-thumb{background:var(--pink-mid);border-radius:2px;}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>window.PROF_DB_ROLE='cast';</script>
+<script src="prof_db.js"></script>
 </head>
 <body>
 <div class="app">
@@ -1172,7 +1175,7 @@ async function sendToGAS(data, url) {
     // FormDataで送信（no-corsでも確実に届く方式）
     const form = new FormData();
     form.append('payload', JSON.stringify(data));
-    await fetch(url, {
+    await profFetch(url, {
       method: 'POST',
       mode: 'no-cors',
       body: form
