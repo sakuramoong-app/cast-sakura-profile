@@ -315,34 +315,13 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
   ">
     <div style="font-size:36px;margin-bottom:12px">🔐</div>
     <div style="font-size:20px;font-weight:900;color:#3D2B35;margin-bottom:6px">内勤管理ページ</div>
-    <div style="font-size:13px;color:#9A7D87;margin-bottom:28px;line-height:1.6">
-      サクラムーンG スタッフ専用ページです。<br>パスワードを入力してください。
+    <div style="font-size:13px;color:#9A7D87;margin-bottom:20px;line-height:1.6">
+      サクラムーンG スタッフ専用ページです。
     </div>
-    <input id="auth-input" type="password" placeholder="パスワード"
-      onkeydown="if(event.key==='Enter')checkAuth()"
-      style="
-        width:100%;background:#FFF5F8;border:1.5px solid #F0C8D5;
-        border-radius:12px;padding:13px 16px;font-size:16px;
-        color:#3D2B35;font-family:inherit;outline:none;
-        text-align:center;letter-spacing:3px;margin-bottom:10px;
-        transition:border-color .2s;
-      "
-      onfocus="this.style.borderColor='#FF8FAB'" onblur="this.style.borderColor='#F0C8D5'"
-    >
+    <!-- ★ ポータルからだけ入れる（パスワードでのログインは廃止） -->
     <div id="auth-error" style="
-      display:none;color:#FF5A7A;font-size:13px;font-weight:700;
-      margin-bottom:10px;
-    ">❌ パスワードが違います</div>
-    <button onclick="checkAuth()" style="
-      width:100%;background:linear-gradient(135deg,#FF8FAB,#FF6B9D);
-      border:none;border-radius:12px;padding:14px;
-      font-size:15px;font-weight:700;color:#fff;
-      cursor:pointer;font-family:inherit;
-      box-shadow:0 4px 16px rgba(255,107,157,.28);
-      transition:all .2s;
-    " onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='translateY(0)'">
-      ログイン
-    </button>
+      color:#9A7D87;font-size:14px;font-weight:700;line-height:1.7;
+    ">ポータルから開いてください</div>
   </div>
 </div>
 
@@ -521,75 +500,104 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 
 <script>
 // =========================================================
-//  パスワード認証
-//  ★ パスワードを変更する場合はここを書き換えてください ★
+//  認証 ★ ポータルからだけ入れる（2026/10 パスワードでのログインは廃止）
+//  ポータルから入ると、GASが「入館証」（期限つき）を発行する。
+//  読み書きのたびにこの入館証を _token として送る（generateGasToken）。
+//  期限は「ポータルでログインしてから20時間」。このブラウザにだけ覚えておく。
 // =========================================================
-// ============================================================
-//  認証 - パスワードのハッシュのみHTMLに保持（平文は書かない）
-//  パスワード変更時は STAFF_PW_HASH を更新してください
-// ============================================================
-const SESSION_HOURS = 24;
+const PROF_SESSION_KEY = 'profPortalSession';   // {token, expiresAt}
 
-// ★ パスワードを変更したらこのハッシュ値も更新が必要です
-// ハッシュの計算方法: ブラウザのコンソールで hashPassword('新しいパスワード') を実行
-const STAFF_PW_HASH = '08937320';
-
-async function hashPassword(pw) {
-  const encoder = new TextEncoder();
-  const data    = encoder.encode(pw + 'sakuramoong_salt_2024');
-  const hashBuf = await crypto.subtle.digest('SHA-256', data);
-  const hashArr = Array.from(new Uint8Array(hashBuf));
-  return hashArr.map(b => b.toString(16).padStart(2,'0')).join('').slice(0, 8);
+function loadProfSession() {
+  try {
+    const s = JSON.parse(localStorage.getItem(PROF_SESSION_KEY) || 'null');
+    if (s && s.token && Number(s.expiresAt) > Date.now()) return s;
+  } catch (e) {}
+  try { localStorage.removeItem(PROF_SESSION_KEY); } catch (e) {}
+  return null;
 }
 
-async function checkAuth() {
-  const inp = document.getElementById('auth-input');
-  const pw  = inp.value;
-  if (!pw) return;
+function showAuthScreen(msg) {
+  document.getElementById('auth-error').textContent = msg || 'ポータルから開いてください';
+  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('main-app').style.display    = 'none';
+}
 
-  const hash = await hashPassword(pw);
-  if (hash === STAFF_PW_HASH) {
-    const expiry = Date.now() + SESSION_HOURS * 60 * 60 * 1000;
-    sessionStorage.setItem('sakuraMoon_authExpiry', expiry);
-    sessionStorage.setItem('sakuraMoon_authHash',   hash);
-    document.getElementById('auth-screen').style.display = 'none';
-    document.getElementById('main-app').style.display    = 'flex';
-    init();
-  } else {
-    const errEl = document.getElementById('auth-error');
-    errEl.textContent = '❌ パスワードが違います';
-    errEl.style.display = 'block';
-    inp.value = '';
-    inp.style.borderColor = '#FF5A7A';
-    setTimeout(() => { inp.style.borderColor = '#F0C8D5'; errEl.style.display = 'none'; }, 2000);
-  }
+function showMainApp() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('main-app').style.display    = 'flex';
+  init();
 }
 
 function logout() {
-  sessionStorage.removeItem('sakuraMoon_authExpiry');
-  sessionStorage.removeItem('sakuraMoon_authHash');
-  location.reload();
+  try { localStorage.removeItem(PROF_SESSION_KEY); } catch (e) {}
+  showAuthScreen('ログアウトしました。ポータルから開いてください');
 }
 
-// 起動時に認証チェック（PW変更時は自動ログアウト）
-(function() {
-  const expiry    = parseInt(sessionStorage.getItem('sakuraMoon_authExpiry') || '0');
-  const savedHash = sessionStorage.getItem('sakuraMoon_authHash') || '';
-  const sessionValid = Date.now() < expiry && savedHash === STAFF_PW_HASH;
+// GASが入館証を受け付けなかったとき（期限切れ・無効化）
+function handleProfAuthError() {
+  try { localStorage.removeItem(PROF_SESSION_KEY); } catch (e) {}
+  showAuthScreen('ログインの期限が切れました。ポータルから開き直してください');
+}
 
-  if (sessionValid) {
-    document.getElementById('auth-screen').style.display = 'none';
-    document.getElementById('main-app').style.display    = 'flex';
-    document.addEventListener('DOMContentLoaded', () => init());
-  } else {
-    sessionStorage.removeItem('sakuraMoon_authExpiry');
-    sessionStorage.removeItem('sakuraMoon_authHash');
-    document.getElementById('auth-screen').style.display = 'flex';
-    document.getElementById('main-app').style.display    = 'none';
-    document.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('auth-input')?.focus();
+// ポータルは「staff.html#portalSso=…&operator=名前」で開く。
+// # 以降はサーバーに送られない。読んだらすぐURLから消す。
+function takePortalSso() {
+  if (location.hash.indexOf('portalSso=') < 0) return null;
+  const hp = new URLSearchParams(location.hash.slice(1));
+  const ssoToken = hp.get('portalSso') || '';
+  const operator = hp.get('operator') || '';
+  history.replaceState(null, '', location.pathname + location.search);
+  return (ssoToken && operator) ? { ssoToken, operator } : null;
+}
+
+async function portalSsoLogin(sso) {
+  showAuthScreen('⏳ ポータルから入っています…');
+  try {
+    // ※ 通行証は1回しか使えないので、失敗しても送り直さない
+    const res  = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ _type: 'ssoLogin', ssoToken: sso.ssoToken, operator: sso.operator }),
     });
+    const data = await res.json();
+    if (data.result === 'ok' && data.token) {
+      localStorage.setItem(PROF_SESSION_KEY, JSON.stringify({
+        token: data.token,
+        expiresAt: Number(data.expiresAt) || (Date.now() + 20 * 60 * 60 * 1000),
+      }));
+      showMainApp();
+      return;
+    }
+  } catch (e) {
+    console.warn('ポータルからのログインエラー:', e);
   }
+  showAuthScreen('入れませんでした。ポータルからもう一度開いてください');
+}
+
+// 起動時：すでに入っていればそのまま開く／ポータルから来たら入館証をもらう／それ以外は案内だけ
+(function() {
+  const sso = takePortalSso();
+  document.addEventListener('DOMContentLoaded', () => {
+    // GAS_URL などの定数が揃ってから動かすため DOMContentLoaded で実行
+    if (loadProfSession()) showMainApp();
+    else if (sso) portalSsoLogin(sso);
+    else showAuthScreen();
+  });
+})();
+
+// ポータルでログインしてから20時間で自動ログアウト
+// スリープ中に時刻を過ぎることもあるので、1分ごとと画面に戻ったときに確かめる
+(function() {
+  const check = () => {
+    if (document.getElementById('main-app').style.display === 'none') return;
+    if (!loadProfSession()) {
+      showAuthScreen('ポータルでログインしてから20時間たったので、ログアウトしました。ポータルから開き直してください');
+    }
+  };
+  setInterval(check, 60 * 1000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') check();
+  });
 })();
 
 function copyText(text, btn) {
@@ -4423,16 +4431,16 @@ async function sendGeneratedToGAS(cast) {
 // =========================================================
 //  初期化：LocalStorageからフォーム提出データをマージ
 // =========================================================
-// GAS側のgenerateTokenと同じロジックでトークンを生成
+// GASに送る _token ＝ ポータルから入ったときにGASが発行した入館証（2026/10 変更）
+// （以前は画面の中で計算していたが、誰でも同じ値を作れたので鍵になっていなかった）
 function generateGasToken() {
-  const today = new Date().toISOString().slice(0, 10);
-  const raw   = 'sg_gas_token_xk9m' + today + 'sakuramoong_salt';
-  let hash = 0;
-  for (let i = 0; i < raw.length; i++) {
-    hash = ((hash << 5) - hash) + raw.charCodeAt(i);
-    hash |= 0;
-  }
-  return String(Math.abs(hash));
+  const s = loadProfSession();
+  return s ? s.token : '';
+}
+
+// 読み取り用URL（入館証つき）
+function gasGetUrl(action) {
+  return `${GAS_URL}?action=${encodeURIComponent(action)}&token=${encodeURIComponent(generateGasToken())}`;
 }
 
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzi57Ov9kuxR9dP4nHk3nMg3usGF4XCPqYmt_sJ8CrXAFbD6vUSVIP7PUsRSgOwFsP_/exec';
@@ -4452,9 +4460,13 @@ async function init() {
 async function loadFromGAS() {
   try {
     // 常に全件取得して削除済みを確実に除去する
-    const res  = await fetch(`${GAS_URL}?action=getCasts`);
+    const res  = await fetch(gasGetUrl('getCasts'));
     const data = await res.json();
 
+    if (data.result === 'error' && data.message === '認証エラー') {
+      handleProfAuthError();
+      return;
+    }
     if (data.result === 'ok') {
       const gasCasts = data.casts || [];
       const validIds = new Set(gasCasts.map(c => String(c.id)));
@@ -4498,7 +4510,7 @@ async function loadFromGAS() {
 
       // 記録・ログ（面接日/入店日/退店日/ヒアリング/クレーム等）を別途取得してキャストごとに紐付け
       try {
-        const logsRes  = await fetch(`${GAS_URL}?action=getLogs`);
+        const logsRes  = await fetch(gasGetUrl('getLogs'));
         const logsData = await logsRes.json();
         if (logsData.result === 'ok') {
           const allLogs = logsData.logs || [];
@@ -4510,7 +4522,7 @@ async function loadFromGAS() {
 
       // エリア別ホテル一覧（内勤側で登録したマスタリスト）を取得
       try {
-        const hotelsRes  = await fetch(`${GAS_URL}?action=getHotels`);
+        const hotelsRes  = await fetch(gasGetUrl('getHotels'));
         const hotelsData = await hotelsRes.json();
         if (hotelsData.result === 'ok') {
           // 旧バージョンのgas_prof.gs（tags/storeStatus未対応）から取得した場合も壊れないよう既定値で補う
@@ -4524,7 +4536,7 @@ async function loadFromGAS() {
 
       // エリア名・タグの「よく使う語彙」マスタを取得
       try {
-        const metaRes  = await fetch(`${GAS_URL}?action=getHotelMeta`);
+        const metaRes  = await fetch(gasGetUrl('getHotelMeta'));
         const metaData = await metaRes.json();
         if (metaData.result === 'ok') {
           hotelMeta = { areas: metaData.areas || [], tags: metaData.tags || [] };
@@ -4533,7 +4545,7 @@ async function loadFromGAS() {
 
       // プロフィール提出時のメール通知先を取得
       try {
-        const notifyRes  = await fetch(`${GAS_URL}?action=getNotifySettings`);
+        const notifyRes  = await fetch(gasGetUrl('getNotifySettings'));
         const notifyData = await notifyRes.json();
         if (notifyData.result === 'ok') {
           notifyEmails = notifyData.emails || [];
