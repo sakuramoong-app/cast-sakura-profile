@@ -2550,7 +2550,7 @@ function renderHotelEditRow(h) {
   return `
     <div style="background:var(--pink-bg);border-radius:10px;padding:10px;margin-bottom:8px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px">
-        <span style="font-size:13px;font-weight:700;color:var(--text)">${esc(h.hotelName)}</span>
+        <span style="font-size:13px;font-weight:700;color:var(--text)">${esc(h.hotelName)}</span>${h.mapUrl ? `<a href="${esc(h.mapUrl)}" target="_blank" rel="noopener" title="地図を開く" style="margin-left:6px;font-size:12px;text-decoration:none">📍地図</a>` : ""}
         <div style="display:flex;gap:4px;flex-shrink:0">
           <button onclick="cycleStoreStatus('${h.hotelId}')" style="padding:3px 8px;border-radius:8px;font-size:10px;font-weight:700;border:1.5px solid;cursor:pointer;font-family:inherit;white-space:nowrap;${storeStyle}">${storeLabel}</button>
           <button onclick="deleteHotelEntry('${h.hotelId}')" style="background:none;border:none;color:#c0304a;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">削除</button>
