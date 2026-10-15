@@ -119,7 +119,19 @@
 
   /* ---------- 書きこみ（POST の _type） ---------- */
   const POST = {
-    async updateConfirmed(d){ return q(await sb.rpc('prof_update_confirmed', { p: d })); },
+    // だれが直したかを履歴に残すため、ポータルで選んでいる担当者を一緒に送る
+    async updateConfirmed(d){
+      let by = '';
+      try{ by = localStorage.getItem('currentOperator') || ''; }catch(e){}
+      return q(await sb.rpc('prof_update_confirmed', { p: Object.assign({}, d, { by }) }));
+    },
+
+    // 変更の履歴（そのキャストの分。新しい順）
+    async getHistory(d){
+      const rows = q(await sb.from('prof_history').select('path,before,after,by_name,source,at')
+        .eq('cast_id', str(d.castId)).order('at', { ascending: false }).order('id', { ascending: false }).limit(300));
+      return { result: 'ok', history: rows || [] };
+    },
 
     async delete(d){
       let rows = q(await sb.from('prof_casts').update({ deleted: true }).eq('id', str(d.id)).select('id'));

@@ -1797,6 +1797,16 @@ function renderAnswerTab(cast) {
 
     ${renderLogPanel(cast)}
 
+    <div class="panel" id="panel-history">
+      <div class="panel-header" style="cursor:pointer" onclick="toggleHistoryPanel()">
+        <div class="panel-title">🕘 変更の履歴（だれが・いつ・何を変えたか）</div>
+        <span id="history-caret" style="font-size:12px;color:var(--text2)">${historyPanelOpen ? '▴ 閉じる' : '▾ 開く'}</span>
+      </div>
+      <div class="panel-body" id="history-body" style="display:${historyPanelOpen ? 'block' : 'none'}">
+        <div style="font-size:12px;color:var(--text2)">読み込み中…</div>
+      </div>
+    </div>
+
     <div style="position:sticky;bottom:16px;padding:0 0 8px">
       <button onclick="saveAllEdits()" style="
         width:100%;background:linear-gradient(135deg,#7DD8B0,#4CC494);
@@ -1812,6 +1822,96 @@ function renderAnswerTab(cast) {
 
   window._editMode = false;
   window._optEditMode = false;
+  loadHistory(cast, storeKey);
+}
+
+// =========================================================
+//  変更の履歴（Supabase の prof_history。保存のたびに自動で残る）
+//  ・各コメント欄に「最終更新：だれ・いつ」を出す
+//  ・🕘 変更の履歴のパネルに一覧を出す
+// =========================================================
+var historyPanelOpen = false;
+var historyCache = {};   // castId → 履歴の配列
+const HISTORY_LABELS = {
+  name:'源氏名', age:'年齢', size:'サイズ', psize:'Pサイズ', state:'状態', hair:'髪', personality:'性格', hobby:'趣味',
+  charm:'チャームポイント', tabako:'タバコ', erogenous:'性感帯', skill:'得意なこと', vibes:'雰囲気',
+  comment:'キャストからひとこと', mgrComment:'店長から一言', internal:'内勤への連絡事項', generatedManagerComment:'店長から一言',
+  generatedCastComment:'キャストからひとこと（生成）', backData:'バック', honshimei:'本指名バック', options:'オプション', optMemo:'オプションのメモ',
+  interviewDate:'面接日', joinDate:'入店日', leaveDate:'退店日', joinReason:'入店理由・目標', leaveReason:'退店理由',
+  hotelPrefs:'ホテルの希望', retired:'退店', status:'ステータス', active:'この店舗に在籍', personalityType:'性格タイプ',
+  personalityAnswers:'性格タイプの回答', photos:'写真'
+};
+function historyLabel(path) {
+  if (path.charAt(0) === '(') return path.replace(/[()]/g, '');
+  const m = path.match(/^storeProfiles\.(.+)\.([^.]+)$/);
+  if (m) return (HISTORY_LABELS[m[2]] || m[2]) + '（' + m[1] + '）';
+  return HISTORY_LABELS[path] || path;
+}
+function historyText(v) {
+  if (v === null || v === undefined || v === '') return '（空）';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'boolean') return v ? 'はい' : 'いいえ';
+  return JSON.stringify(v);
+}
+function historyWhen(at) {
+  const d = new Date(at);
+  return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+function historyWho(h) {
+  if (h.source === 'cast') return '👤 キャスト本人';
+  const mk = staffMark(h.by_name);
+  return mk.emoji + ' ' + (h.by_name || '不明');
+}
+function toggleHistoryPanel() {
+  historyPanelOpen = !historyPanelOpen;
+  const b = document.getElementById('history-body'), c = document.getElementById('history-caret');
+  if (b) b.style.display = historyPanelOpen ? 'block' : 'none';
+  if (c) c.textContent = historyPanelOpen ? '▴ 閉じる' : '▾ 開く';
+}
+async function loadHistory(cast, storeKey) {
+  const id = String(cast.id);
+  if (historyCache[id]) { paintHistory(cast, storeKey); }
+  try {
+    const form = new FormData();
+    form.append('payload', JSON.stringify({ _type: 'getHistory', _token: generateGasToken(), castId: id }));
+    const r = await (await profFetch(GAS_URL, { method: 'POST', body: form })).json();
+    if (r.result !== 'ok') throw new Error(r.message || '');
+    historyCache[id] = r.history || [];
+  } catch (e) {
+    historyCache[id] = historyCache[id] || null;
+  }
+  if (String(currentCastId) === id) paintHistory(cast, storeKey);
+}
+function paintHistory(cast, storeKey) {
+  const list = historyCache[String(cast.id)];
+  const body = document.getElementById('history-body');
+  if (body) {
+    if (!list) body.innerHTML = '<div style="font-size:12px;color:var(--text2)">履歴を読み込めませんでした</div>';
+    else if (!list.length) body.innerHTML = '<div style="font-size:12px;color:var(--text2)">まだ履歴はありません（これから保存した分から残ります）</div>';
+    else body.innerHTML = '<div style="max-height:360px;overflow-y:auto">' + list.map(h => {
+      const mk = h.source === 'cast' ? { color: '#c9556a', bg: '#FDF3F5' } : staffMark(h.by_name);
+      const isEvent = h.path.charAt(0) === '(';
+      return `<div style="background:${mk.bg};border-left:4px solid ${mk.color};border-radius:8px;padding:7px 10px;margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:700">
+          <span style="color:${mk.color}">${esc(historyWho(h))}</span><span style="color:var(--text2)">${esc(historyWhen(h.at))}</span></div>
+        <div style="font-size:12.5px;font-weight:700;margin-top:2px">${esc(historyLabel(h.path))}</div>
+        ${isEvent ? '' : `<div style="font-size:12px;color:var(--text2);margin-top:2px;white-space:pre-wrap;word-break:break-word">
+          <span style="text-decoration:line-through">${esc(historyText(h.before).slice(0, 300))}</span><br>→ <span style="color:var(--text)">${esc(historyText(h.after).slice(0, 300))}</span></div>`}
+      </div>`;
+    }).join('') + '</div>';
+  }
+  // 各コメント欄の「最終更新」
+  const SIG = { comment: ['comment'], manager: ['mgrComment', 'generatedManagerComment'], internal: ['internal'] };
+  Object.keys(SIG).forEach(box => {
+    const panel = document.getElementById('panel-' + box);
+    if (!panel || !list) return;
+    const paths = [];
+    SIG[box].forEach(f => { paths.push('storeProfiles.' + storeKey + '.' + f); if (storeKey === 'サクラムーン') paths.push(f); });
+    const h = list.find(x => paths.indexOf(x.path) >= 0);
+    let el = panel.querySelector('.last-edit');
+    if (!el) { el = document.createElement('div'); el.className = 'last-edit'; el.style.cssText = 'font-size:11px;color:var(--text2);margin-top:6px;text-align:right'; panel.querySelector('.panel-body').appendChild(el); }
+    el.textContent = h ? '最終更新：' + historyWho(h) + '　' + historyWhen(h.at) : '';
+  });
 }
 
 // =========================================================
