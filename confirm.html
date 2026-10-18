@@ -101,6 +101,7 @@ select{font:inherit;font-size:16px;border:1.5px solid var(--border);border-radiu
       <div class="desc">今の公式HPの内容が入っています。<b>合っていればそのままでOK</b>。変わったところだけ直してください。</div>
       <div id="profHp"></div>
       <div id="profFields"></div>
+      <div id="intro"></div>
     </div>
   </div>
 
@@ -157,8 +158,6 @@ select{font:inherit;font-size:16px;border:1.5px solid var(--border);border-radiu
         </div>
       </div>
 
-      <label class="f">🗺 行けるお店・エリアと、移動のしかた <span style="color:var(--error)">＊</span></label>
-      <textarea id="area" maxlength="1000" placeholder="例：池袋・鶯谷のみ／鶯谷以外はタクシーか車で移動したい（とくになければ「とくになし」）"></textarea>
 
       <label class="f">🏨 ホテルの希望（NG・苦手・好きなホテル）</label>
       <textarea id="hotel" maxlength="1000" placeholder="例：○○ホテルはハウスダストがつらいのでNG／△△ホテルはお部屋がきれいで好き"></textarea>
@@ -238,7 +237,14 @@ const OPT_CHOICES = {
 const choicesOf = k => OPT_CHOICES[k] ? Object.keys(OPT_CHOICES[k]) : ['◎','○','△','×'];
 const STEPS = 5;
 let cur = 0, info = null;
-let st = { profile: {}, options: {}, optMemo: {}, popts: [], announce: [], interval: '', longMax: '', longOver: '', area: '', hotel: '', notes: '', pq: {} };
+// 紹介文：self＝自己紹介文（本人から一言）／mgr＝店長紹介文。want：'' 未選択・'keep' このままでOK・'change' 変えたい
+const INTRO = [
+  { k: 'self', hp: 'comment', title: '💬 自己紹介文（本人から一言）', ask: 'こう書いてほしい、という文章をそのまま書いてください',
+    ph: '例：はじめまして♡ ○○です。…（このまま公式HPにのせる文章）' },
+  { k: 'mgr', hp: 'mgrComment', title: '📝 店長紹介文（店長から一言）', ask: 'こういう内容で書いてほしい、という希望を書いてください（単語・入れてほしいフレーズなどでOK）',
+    ph: '例：「癒し系」「笑顔」を入れてほしい／趣味のゲームの話を入れてほしい／最新のSNSフォロワー数に直してほしい' },
+];
+let st = { profile: {}, intro: { self: { want: '', text: '' }, mgr: { want: '', text: '' } }, options: {}, optMemo: {}, popts: [], announce: [], interval: '', longMax: '', longOver: '', hotel: '', notes: '', pq: {} };
 
 /* ---------- 読みこみ ---------- */
 async function load(){
@@ -269,9 +275,10 @@ function fatal(m){ $('loading').style.display = 'none'; const f = $('fatal'); f.
 function fromSaved(d){
   const pq = {};
   ((d.personalityAnswers && d.personalityAnswers.list) || []).forEach(a => { if(a.choice) pq[a.n] = { choice: a.choice, text: a.text || '' }; });
-  return { profile: d.profile || {}, options: d.options || {}, optMemo: d.optMemo || {},
+  return { profile: d.profile || {}, intro: d.introChange || { self: { want: '', text: '' }, mgr: { want: '', text: '' } },
+           options: d.options || {}, optMemo: d.optMemo || {},
            popts: d.personalOptions || [], announce: d.mustAnnounce || [], interval: d.interval == null ? '' : String(d.interval),
-           longMax: d.longMax == null ? '' : String(d.longMax), longOver: d.longOver || '', area: d.area || '',
+           longMax: d.longMax == null ? '' : String(d.longMax), longOver: d.longOver || '',
            hotel: d.hotel || '', notes: d.notes || '', pq };
 }
 function saveDraft(){ try{ localStorage.setItem(DRAFT_KEY, JSON.stringify({ savedAt: Date.now(), st })); }catch(e){} }
@@ -284,6 +291,22 @@ function build(){
   $('profFields').innerHTML = FIELDS.map(([k, label]) => `<label class="f">${esc(label)}</label>
     <input type="text" maxlength="200" value="${esc(st.profile[k] || '')}" oninput="st.profile['${k}']=this.value;saveDraft()">`).join('');
 
+  if(!st.intro || !st.intro.self) st.intro = { self: { want: '', text: '' }, mgr: { want: '', text: '' } };
+  $('intro').innerHTML = INTRO.map(x => {
+    const cur = (hp && hp[x.hp]) || '', s = st.intro[x.k];
+    return `<div id="in_${x.k}" style="margin-top:16px;border-top:1px dashed var(--border);padding-top:12px">
+      <label class="f" style="margin-top:0">${x.title}</label>
+      <div style="white-space:pre-wrap;font-size:13px;background:var(--pink-bg);border-radius:10px;padding:8px 10px;max-height:160px;overflow:auto">${cur ? esc(cur) : '（公式HPに文章が見つかりませんでした）'}</div>
+      <div class="seg" style="margin-top:8px">
+        <input type="radio" name="iw_${x.k}" id="iw_${x.k}_k" ${s.want === 'keep' ? 'checked' : ''} onchange="setIntro('${x.k}','keep')"><label for="iw_${x.k}_k" style="font-size:14px">このままでOK</label>
+        <input type="radio" name="iw_${x.k}" id="iw_${x.k}_c" ${s.want === 'change' ? 'checked' : ''} onchange="setIntro('${x.k}','change')"><label for="iw_${x.k}_c" style="font-size:14px">変えたい（希望）</label>
+      </div>
+      <div id="ib_${x.k}" style="display:${s.want === 'change' ? '' : 'none'};margin-top:6px">
+        <div class="hint">${x.ask}</div>
+        <textarea maxlength="2000" placeholder="${esc(x.ph)}" oninput="st.intro['${x.k}'].text=this.value;saveDraft()">${esc(s.text || '')}</textarea>
+      </div></div>`;
+  }).join('');
+
   $('opts').innerHTML = OPTS.map(([k], i) => `<div class="opt" id="opt${i}">
       <div class="top"><div class="nm">${esc(k)}</div>
         <div class="seg">${choicesOf(k).map(v => `<input type="radio" name="o${i}" id="o${i}${v}" value="${v}" ${st.options[k] === v ? 'checked' : ''} onchange="setOpt(${i},'${v}')"><label for="o${i}${v}">${v}</label>`).join('')}</div></div>
@@ -293,7 +316,7 @@ function build(){
 
   renderAnnounce();
   renderPopts();
-  ['interval','longMax','area','hotel','notes'].forEach(id => {
+  ['interval','longMax','hotel','notes'].forEach(id => {
     $(id).value = st[id] || '';
     const sel = $(id).tagName === 'SELECT';
     $(id).addEventListener(sel ? 'change' : 'input', e => { st[id] = e.target.value; e.target.classList.remove('miss'); if(id === 'longMax') longOverShow(); saveDraft(); });
@@ -312,6 +335,7 @@ function build(){
   }).join('');
   pqCount();
 }
+function setIntro(k, v){ st.intro[k].want = v; $('ib_' + k).style.display = v === 'change' ? '' : 'none'; $('in_' + k).classList.remove('miss'); saveDraft(); }
 function longOverShow(){ $('longOverBox').style.display = (st.longMax && st.longMax !== '0') ? '' : 'none'; }
 function renderPopts(){
   $('popts').innerHTML = st.popts.map((p, i) => `<div class="list-item">
@@ -355,6 +379,13 @@ function nextStep(){
   go(cur + 1);
 }
 function check(n){
+  if(n === 1){
+    for(const x of INTRO){
+      const s = st.intro[x.k];
+      if(!s.want) return { msg: x.title.replace(/^\S+\s/, '') + '：「このままでOK」か「変えたい」を選んでください', el: $('in_' + x.k) };
+      if(s.want === 'change' && !(s.text || '').trim()) return { msg: x.title.replace(/^\S+\s/, '') + '：希望を書いてください', el: $('in_' + x.k) };
+    }
+  }
   if(n === 2){
     for(let i = 0; i < OPTS.length; i++){
       const k = OPTS[i][0];
@@ -367,7 +398,6 @@ function check(n){
     if(st.interval === '') return { msg: '「予約と予約の間（インターバル）」を選んでください', el: $('interval') };
     if(st.longMax === '') return { msg: '「長いコースは何分まで受けられますか？」を選んでください', el: $('longMax') };
     if(st.longMax !== '0' && !st.longOver) return { msg: 'それより長いコースは「確認してから」か「受けない」かを選んでください', el: $('longOverBox') };
-    if(!st.area.trim()) return { msg: '「行けるお店・エリアと、移動のしかた」を書いてください（とくになければ「とくになし」）', el: $('area') };
     if(!st.notes.trim()) return { msg: '「電話受付外でのご要望」を書いてください（なければ「なし」）', el: $('notes') };
   }
   if(n === 4){
@@ -385,11 +415,13 @@ function payload(){
   return {
     form: 'existing-confirm-v2',
     profile: st.profile, options, optMemo, optMeaning: OPT_CHOICES,
+    introChange: { self: { want: st.intro.self.want, text: st.intro.self.want === 'change' ? st.intro.self.text.trim() : '' },
+                   mgr:  { want: st.intro.mgr.want,  text: st.intro.mgr.want  === 'change' ? st.intro.mgr.text.trim()  : '' } },
     mustAnnounce: st.announce.map(s => s.trim()).filter(Boolean),
     personalOptions: st.popts.map(p => ({ name: (p.name || '').trim(), price: (p.price || '').trim() })).filter(p => p.name),
     interval: st.interval === '' ? null : Number(st.interval),
     longMax: st.longMax === '' ? null : Number(st.longMax), longOver: st.longMax === '0' ? '' : st.longOver,
-    area: st.area.trim(), hotel: st.hotel.trim(), notes: st.notes.trim(),
+    hotel: st.hotel.trim(), notes: st.notes.trim(),
     personalityAnswers: { list: PQ_QUESTIONS.map(q => ({ n: q.n, q: q.q, choice: (st.pq[q.n] || {}).choice || '', text: (st.pq[q.n] || {}).text || '' })), axisSummary: r.axisResults },
     personalityType: r.typeCode,
     hpProfile: info.hp ? info.hp.fields : null, hpOptions: info.hp ? info.hp.options : null,   // 照らし合わせ用（そのときの公式HP）
@@ -400,13 +432,13 @@ function summaryText(){
   const p = payload();
   const lines = ['【プロフィール】'];
   FIELDS.forEach(([k, l]) => lines.push(l.replace(/（.*$/, '') + '：' + (p.profile[k] || '')));
+  INTRO.forEach(x => { const s = p.introChange[x.k]; lines.push('', '【' + x.title.replace(/^\S+\s/, '') + '】', s.want === 'change' ? '変えたい：' + s.text : 'このままでOK'); });
   lines.push('', '【オプション】');
   OPTS.forEach(([k]) => lines.push(k + '：' + p.options[k] + (OPT_CHOICES[k] && OPT_CHOICES[k][p.options[k]] ? '（' + OPT_CHOICES[k][p.options[k]] + '）' : '') + (p.optMemo[k] ? '　' + p.optMemo[k] : '')));
   lines.push('', '【個人オプション】', ...(p.personalOptions.length ? p.personalOptions.map(o => '・' + o.name + (o.price ? '　' + o.price : '')) : ['（なし）']));
   lines.push('', '【受付時お客様に必ず確認・案内してほしいこと】', ...(p.mustAnnounce.length ? p.mustAnnounce.map(s => '・' + s) : ['（なし）']));
   lines.push('', '【予約と予約の間】', p.interval ? p.interval + '分' : 'なし（続けてOK）');
   lines.push('', '【長いコース】', p.longMax ? p.longMax + '分まで（それより長いのは' + (p.longOver === 'ng' ? '受けない' : '確認してから') + '）' : '何分でもOK');
-  lines.push('', '【行けるお店・エリアと移動】', p.area);
   lines.push('', '【ホテルの希望】', p.hotel || '（なし）', '', '【電話受付外でのご要望】', p.notes);
   lines.push('', '【性格タイプチェック】', PQ_QUESTIONS.filter(q => pqDone(q.n)).length + ' / ' + PQ_QUESTIONS.length + ' 問 回答済み');
   return lines.join('\n');
