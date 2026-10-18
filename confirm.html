@@ -231,8 +231,11 @@ async function load(){
   const hp = info.hp || {};
   FIELDS.forEach(([k]) => { st.profile[k] = (hp.fields && hp.fields[k]) || ''; });
   OPTS.forEach(([k, hk]) => { const v = hp.options ? (hp.options[k] || (hk && hp.options[hk]) || '') : ''; st.options[k] = (!OPT_CHOICES[k] && choicesOf(k).includes(v)) ? v : ''; });   // 女装・外国人は意味が新しいので、公式HPからは入れない
+  const hpProfile = Object.assign({}, st.profile);
   if(info.last) Object.assign(st, fromSaved(info.last));
   try{ const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); if(d && (!info.submittedAt || (d.savedAt && d.savedAt > Date.parse(info.submittedAt)))) Object.assign(st, d.st); }catch(e){}
+  // 前の答え・書きかけで空いているプロフィールの欄は、公式HPの内容でうめる
+  FIELDS.forEach(([k]) => { if(!(st.profile[k] || '').trim() && hpProfile[k]) st.profile[k] = hpProfile[k]; });
 
   build();
   $('loading').style.display = 'none'; $('nav').style.display = ''; $('bar').style.display = '';
