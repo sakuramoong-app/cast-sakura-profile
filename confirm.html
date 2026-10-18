@@ -113,6 +113,11 @@ select{font:inherit;font-size:16px;border:1.5px solid var(--border);border-radiu
       <div class="legend">◎ 得意・大歓迎　○ できる　△ 条件つき・内容による　× できない<br>
         <b>女装・外国人のお客様</b>は、それぞれの下に書いてある意味で選び直してください（空欄になっています）。</div>
       <div id="opts"></div>
+
+      <label class="f">🎁 自分だけの個人オプション（あれば）</label>
+      <div class="hint">例：「TSP」15,000円／「ポラロイド」6,000円。なければ空欄でOKです。</div>
+      <div id="popts"></div>
+      <button class="btn btn-g btn-s" type="button" style="margin-top:6px" onclick="st.popts.push({name:'',price:''});renderPopts();saveDraft()">＋ 個人オプションを足す</button>
     </div>
   </div>
 
@@ -137,8 +142,26 @@ select{font:inherit;font-size:16px;border:1.5px solid var(--border);border-radiu
         <option value="30">30分</option><option value="45">45分</option><option value="60">60分</option><option value="90">90分</option>
       </select>
 
-      <label class="f">🏨 ホテル・エリアの希望（NG・苦手・好きなところ）</label>
-      <textarea id="hotel" maxlength="1000" placeholder="例：○○ホテルはハウスダストがつらいのでNG／鶯谷以外はタクシー移動したい"></textarea>
+      <label class="f">⌛ 長いコースは何分まで受けられますか？ <span style="color:var(--error)">＊</span></label>
+      <select id="longMax">
+        <option value="">選んでください</option>
+        <option value="0">何分でもOK（上限なし）</option>
+        <option value="90">90分まで</option><option value="120">120分まで</option><option value="150">150分まで</option>
+        <option value="180">180分まで</option><option value="240">240分まで</option>
+      </select>
+      <div id="longOverBox" style="display:none;margin-top:6px">
+        <div class="hint">それより長いコースのご予約は…</div>
+        <div class="seg" style="margin-top:4px">
+          <input type="radio" name="longOver" id="lo_ask" value="ask" onchange="st.longOver='ask';saveDraft()"><label for="lo_ask" style="font-size:13px">私に確認してから</label>
+          <input type="radio" name="longOver" id="lo_ng" value="ng" onchange="st.longOver='ng';saveDraft()"><label for="lo_ng" style="font-size:13px">受けない（NG）</label>
+        </div>
+      </div>
+
+      <label class="f">🗺 行けるお店・エリアと、移動のしかた <span style="color:var(--error)">＊</span></label>
+      <textarea id="area" maxlength="1000" placeholder="例：池袋・鶯谷のみ／鶯谷以外はタクシーか車で移動したい（とくになければ「とくになし」）"></textarea>
+
+      <label class="f">🏨 ホテルの希望（NG・苦手・好きなホテル）</label>
+      <textarea id="hotel" maxlength="1000" placeholder="例：○○ホテルはハウスダストがつらいのでNG／△△ホテルはお部屋がきれいで好き"></textarea>
 
       <label class="f">📝 電話受付外でのご要望 <span style="color:var(--error)">＊</span></label>
       <textarea id="notes" maxlength="2000" placeholder="例：在室確認をしてほしいなど受付外でのご要望（なければ「なし」）"></textarea>
@@ -203,7 +226,8 @@ const OPTS = [
   ['69'], ['Sプレイ'], ['Mプレイ'], ['お泊りコース'], ['デートコース'],
   ['キャスト射精（有料）'], ['コース内キャスト2回以上射精（有料）'],
   ['3P／お客様2名（有料）', '3P（有料）'], ['3P／キャスト2名（有料）', '3P（有料）'],
-  ['コスプレ（有料）'], ['ごっくん（有料）'], ['聖水（有料）'], ['女装されているお客様'], ['外国人のお客様'], ['女装レズコース'],
+  ['コスプレ（有料）'], ['ごっくん（有料）'], ['聖水（有料）'], ['女装されているお客様'], ['外国人のお客様'],
+  ['女性のお客様'], ['カップルのお客様'], ['お客様の自宅への出張'], ['写真撮影（有料）'], ['動画撮影（有料）'], ['女装レズコース'],
 ];
 // 選べる記号と、その意味（書いていないものは ◎○△× の普通の意味）
 const OPT_CHOICES = {
@@ -214,7 +238,7 @@ const OPT_CHOICES = {
 const choicesOf = k => OPT_CHOICES[k] ? Object.keys(OPT_CHOICES[k]) : ['◎','○','△','×'];
 const STEPS = 5;
 let cur = 0, info = null;
-let st = { profile: {}, options: {}, optMemo: {}, announce: [], interval: '', hotel: '', notes: '', pq: {} };
+let st = { profile: {}, options: {}, optMemo: {}, popts: [], announce: [], interval: '', longMax: '', longOver: '', area: '', hotel: '', notes: '', pq: {} };
 
 /* ---------- 読みこみ ---------- */
 async function load(){
@@ -246,7 +270,9 @@ function fromSaved(d){
   const pq = {};
   ((d.personalityAnswers && d.personalityAnswers.list) || []).forEach(a => { if(a.choice) pq[a.n] = { choice: a.choice, text: a.text || '' }; });
   return { profile: d.profile || {}, options: d.options || {}, optMemo: d.optMemo || {},
-           announce: d.mustAnnounce || [], interval: d.interval == null ? '' : String(d.interval), hotel: d.hotel || '', notes: d.notes || '', pq };
+           popts: d.personalOptions || [], announce: d.mustAnnounce || [], interval: d.interval == null ? '' : String(d.interval),
+           longMax: d.longMax == null ? '' : String(d.longMax), longOver: d.longOver || '', area: d.area || '',
+           hotel: d.hotel || '', notes: d.notes || '', pq };
 }
 function saveDraft(){ try{ localStorage.setItem(DRAFT_KEY, JSON.stringify({ savedAt: Date.now(), st })); }catch(e){} }
 
@@ -266,8 +292,14 @@ function build(){
     </div>`).join('');
 
   renderAnnounce();
-  $('interval').value = st.interval; $('hotel').value = st.hotel; $('notes').value = st.notes;
-  ['interval','hotel','notes'].forEach(id => $(id).addEventListener(id === 'interval' ? 'change' : 'input', e => { st[id] = e.target.value; e.target.classList.remove('miss'); saveDraft(); }));
+  renderPopts();
+  ['interval','longMax','area','hotel','notes'].forEach(id => {
+    $(id).value = st[id] || '';
+    const sel = $(id).tagName === 'SELECT';
+    $(id).addEventListener(sel ? 'change' : 'input', e => { st[id] = e.target.value; e.target.classList.remove('miss'); if(id === 'longMax') longOverShow(); saveDraft(); });
+  });
+  if(st.longOver) $('lo_' + st.longOver).checked = true;
+  longOverShow();
 
   $('pqTotal').textContent = PQ_QUESTIONS.length;
   $('pqList').innerHTML = PQ_QUESTIONS.map(q => {
@@ -279,6 +311,13 @@ function build(){
         oninput="setPqText(${q.n},this.value)">${esc(a.choice === 'C' ? a.text : '')}</textarea></div></div>`;
   }).join('');
   pqCount();
+}
+function longOverShow(){ $('longOverBox').style.display = (st.longMax && st.longMax !== '0') ? '' : 'none'; }
+function renderPopts(){
+  $('popts').innerHTML = st.popts.map((p, i) => `<div class="list-item">
+    <input type="text" maxlength="60" placeholder="内容（例：TSP）" value="${esc(p.name)}" oninput="st.popts[${i}].name=this.value;saveDraft()">
+    <input type="text" maxlength="30" placeholder="料金（例：15,000円）" style="max-width:130px" value="${esc(p.price)}" oninput="st.popts[${i}].price=this.value;saveDraft()">
+    <button class="btn btn-g btn-s" type="button" onclick="st.popts.splice(${i},1);renderPopts();saveDraft()">消す</button></div>`).join('');
 }
 function setOpt(i, v){ const k = OPTS[i][0]; st.options[k] = v; $('opt' + i).classList.remove('miss'); saveDraft(); }
 function renderAnnounce(){
@@ -326,6 +365,9 @@ function check(n){
     if($('announceNew').value.trim()) addAnnounce();
     if(!st.announce.length) return { msg: '「受付時お客様に必ず確認・案内してほしいこと」を書いて「足す」を押してください（なければ「なし」）', el: $('announceNew') };
     if(st.interval === '') return { msg: '「予約と予約の間（インターバル）」を選んでください', el: $('interval') };
+    if(st.longMax === '') return { msg: '「長いコースは何分まで受けられますか？」を選んでください', el: $('longMax') };
+    if(st.longMax !== '0' && !st.longOver) return { msg: 'それより長いコースは「確認してから」か「受けない」かを選んでください', el: $('longOverBox') };
+    if(!st.area.trim()) return { msg: '「行けるお店・エリアと、移動のしかた」を書いてください（とくになければ「とくになし」）', el: $('area') };
     if(!st.notes.trim()) return { msg: '「電話受付外でのご要望」を書いてください（なければ「なし」）', el: $('notes') };
   }
   if(n === 4){
@@ -344,8 +386,10 @@ function payload(){
     form: 'existing-confirm-v2',
     profile: st.profile, options, optMemo, optMeaning: OPT_CHOICES,
     mustAnnounce: st.announce.map(s => s.trim()).filter(Boolean),
+    personalOptions: st.popts.map(p => ({ name: (p.name || '').trim(), price: (p.price || '').trim() })).filter(p => p.name),
     interval: st.interval === '' ? null : Number(st.interval),
-    hotel: st.hotel.trim(), notes: st.notes.trim(),
+    longMax: st.longMax === '' ? null : Number(st.longMax), longOver: st.longMax === '0' ? '' : st.longOver,
+    area: st.area.trim(), hotel: st.hotel.trim(), notes: st.notes.trim(),
     personalityAnswers: { list: PQ_QUESTIONS.map(q => ({ n: q.n, q: q.q, choice: (st.pq[q.n] || {}).choice || '', text: (st.pq[q.n] || {}).text || '' })), axisSummary: r.axisResults },
     personalityType: r.typeCode,
     hpProfile: info.hp ? info.hp.fields : null, hpOptions: info.hp ? info.hp.options : null,   // 照らし合わせ用（そのときの公式HP）
@@ -358,9 +402,12 @@ function summaryText(){
   FIELDS.forEach(([k, l]) => lines.push(l.replace(/（.*$/, '') + '：' + (p.profile[k] || '')));
   lines.push('', '【オプション】');
   OPTS.forEach(([k]) => lines.push(k + '：' + p.options[k] + (OPT_CHOICES[k] && OPT_CHOICES[k][p.options[k]] ? '（' + OPT_CHOICES[k][p.options[k]] + '）' : '') + (p.optMemo[k] ? '　' + p.optMemo[k] : '')));
+  lines.push('', '【個人オプション】', ...(p.personalOptions.length ? p.personalOptions.map(o => '・' + o.name + (o.price ? '　' + o.price : '')) : ['（なし）']));
   lines.push('', '【受付時お客様に必ず確認・案内してほしいこと】', ...(p.mustAnnounce.length ? p.mustAnnounce.map(s => '・' + s) : ['（なし）']));
   lines.push('', '【予約と予約の間】', p.interval ? p.interval + '分' : 'なし（続けてOK）');
-  lines.push('', '【ホテル・エリアの希望】', p.hotel || '（なし）', '', '【電話受付外でのご要望】', p.notes);
+  lines.push('', '【長いコース】', p.longMax ? p.longMax + '分まで（それより長いのは' + (p.longOver === 'ng' ? '受けない' : '確認してから') + '）' : '何分でもOK');
+  lines.push('', '【行けるお店・エリアと移動】', p.area);
+  lines.push('', '【ホテルの希望】', p.hotel || '（なし）', '', '【電話受付外でのご要望】', p.notes);
   lines.push('', '【性格タイプチェック】', PQ_QUESTIONS.filter(q => pqDone(q.n)).length + ' / ' + PQ_QUESTIONS.length + ' 問 回答済み');
   return lines.join('\n');
 }
