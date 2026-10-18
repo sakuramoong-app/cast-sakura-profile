@@ -246,7 +246,7 @@ function build(){
   $('opts').innerHTML = OPTS.map(([k], i) => `<div class="opt" id="opt${i}">
       <div class="top"><div class="nm">${esc(k)}</div>
         <div class="seg">${['◎','○','△','×'].map(v => `<input type="radio" name="o${i}" id="o${i}${v}" value="${v}" ${st.options[k] === v ? 'checked' : ''} onchange="setOpt(${i},'${v}')"><label for="o${i}${v}">${v}</label>`).join('')}</div></div>
-      <div class="tell ${st.options[k] === '×' ? 'show' : ''}" id="tell${i}">受付でお客様に「できません」と…
+      <div class="tell ${st.options[k] === '×' ? 'show' : ''}" id="tell${i}">×のとき、受付でお客様に「できません」と伝えてほしいですか？
         <div class="seg" style="margin-top:4px">
           <input type="radio" name="t${i}" id="t${i}a" ${st.optTell[k] === 'tell' ? 'checked' : ''} onchange="setTell(${i},'tell')"><label for="t${i}a">伝えてほしい</label>
           <input type="radio" name="t${i}" id="t${i}b" ${st.optTell[k] === 'notell' ? 'checked' : ''} onchange="setTell(${i},'notell')"><label for="t${i}b">伝えないでほしい</label>
