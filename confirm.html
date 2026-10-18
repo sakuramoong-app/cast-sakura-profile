@@ -42,9 +42,9 @@ input:focus,textarea:focus{outline:none;border-color:var(--pink);}
 .seg input{display:none;}
 .seg label{display:inline-flex;align-items:center;justify-content:center;min-width:40px;height:38px;padding:0 8px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;font-weight:700;background:#fff;cursor:pointer;}
 .seg input:checked + label{background:var(--pink);border-color:var(--pink);color:#fff;}
-.tell{margin-top:8px;background:var(--lav-soft);border-radius:10px;padding:8px 10px;font-size:13px;display:none;}
-.tell.show{display:block;}
-.tell .seg label{font-size:13px;height:34px;}
+.means{font-size:12.5px;color:var(--text-sub);margin-top:4px;line-height:1.6;}
+.means b{color:var(--text);}
+select{font:inherit;font-size:16px;border:1.5px solid var(--border);border-radius:10px;padding:9px 11px;background:#FFFBFC;color:var(--text);}
 .memo{margin-top:6px;font-size:14px !important;padding:6px 10px !important;}
 .legend{font-size:12.5px;background:var(--mint-soft);border-radius:10px;padding:8px 12px;margin-bottom:6px;}
 .rowadd{display:flex;gap:6px;margin-top:6px;}
@@ -111,7 +111,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--pink);}
       <h2>オプション（できること）</h2>
       <div class="desc">今の公式HPの内容が入っています。変えたいところだけ直してください。</div>
       <div class="legend">◎ 得意・大歓迎　○ できる　△ 条件つき・内容による　× できない<br>
-        <b>×にしたもの</b>は、受付でお客様に「できません」と<b>伝えてほしいか・伝えないでほしいか</b>も選んでください。</div>
+        <b>女装・外国人のお客様</b>は、それぞれの下に書いてある意味で選び直してください（空欄になっています）。</div>
       <div id="opts"></div>
     </div>
   </div>
@@ -121,22 +121,27 @@ input:focus,textarea:focus{outline:none;border-color:var(--pink);}
     <div class="card">
       <div class="tag">STEP 3 / 5</div>
       <h2>受付へのお願い</h2>
-      <div class="desc">内勤にもう伝えてあることも、<b>ご自身の言葉で</b>書いてください。なければ「なし」でOKです。</div>
+      <div class="desc">内勤にもう伝えてあることも、<b>ご自身の言葉で</b>書いてください。<br>特別強調して、受付時にこちらから確認・案内をしてほしいことをご記入ください。<br>なければ「なし」でOKです。</div>
 
-      <label class="f">📣 受付でお客様に必ず案内してほしいこと</label>
-      <div class="hint">1つずつ足してください。例：「射精は有料オプションです」「必ず一緒にシャワーに入ります」</div>
+      <label class="f">📣 受付時お客様に必ず確認・案内してほしいこと</label>
+      <div class="hint">1つずつ足してください。例：「射精希望かどうかを受付時に必ず確認してほしい」「必ず一緒にシャワーに入ってと強調して案内してほしい」「女装してこないか事前に確認してほしい」など</div>
       <div id="announce"></div>
-      <div class="rowadd"><input type="text" id="announceNew" maxlength="200" placeholder="案内してほしいことを書いて「足す」">
+      <div class="rowadd"><input type="text" id="announceNew" maxlength="200" placeholder="書いて「足す」を押す（なければ「なし」）">
         <button class="btn btn-g btn-s" type="button" onclick="addAnnounce()">足す</button></div>
 
-      <label class="f">🙅 今のNG（お客様・プレイ・その他） <span style="color:var(--error)">＊</span></label>
-      <textarea id="ng" maxlength="2000" placeholder="例：酔っているお客様はNG／カップルNG／自宅への出張はNG"></textarea>
+      <label class="f">⏱ 予約と予約の間（インターバル） <span style="color:var(--error)">＊</span></label>
+      <select id="interval">
+        <option value="">選んでください</option>
+        <option value="0">なし（続けてOK）</option>
+        <option value="10">10分</option><option value="15">15分</option><option value="20">20分</option>
+        <option value="30">30分</option><option value="45">45分</option><option value="60">60分</option><option value="90">90分</option>
+      </select>
 
       <label class="f">🏨 ホテル・エリアの希望（NG・苦手・好きなところ）</label>
       <textarea id="hotel" maxlength="1000" placeholder="例：○○ホテルはハウスダストがつらいのでNG／鶯谷以外はタクシー移動したい"></textarea>
 
-      <label class="f">📝 そのほか、受付で気をつけてほしいこと <span style="color:var(--error)">＊</span></label>
-      <textarea id="notes" maxlength="2000" placeholder="例：外国人のお客様は、日本語で話せるか電話で確認してから、私にも確認してほしい／新規のお客様は、ホテルに入ったら在室確認してほしい／予約と予約の間は30分あけてほしい"></textarea>
+      <label class="f">📝 電話受付外でのご要望 <span style="color:var(--error)">＊</span></label>
+      <textarea id="notes" maxlength="2000" placeholder="例：在室確認をしてほしいなど受付外でのご要望（なければ「なし」）"></textarea>
     </div>
   </div>
 
@@ -198,11 +203,18 @@ const OPTS = [
   ['69'], ['Sプレイ'], ['Mプレイ'], ['お泊りコース'], ['デートコース'],
   ['キャスト射精（有料）'], ['コース内キャスト2回以上射精（有料）'],
   ['3P／お客様2名（有料）', '3P（有料）'], ['3P／キャスト2名（有料）', '3P（有料）'],
-  ['コスプレ（有料）'], ['ごっくん（有料）'], ['聖水（有料）'], ['女装されているお客様'], ['外国人のお客様'],
+  ['コスプレ（有料）'], ['ごっくん（有料）'], ['聖水（有料）'], ['女装されているお客様'], ['外国人のお客様'], ['女装レズコース'],
 ];
+// 選べる記号と、その意味（書いていないものは ◎○△× の普通の意味）
+const OPT_CHOICES = {
+  '女装されているお客様': { '◎': '全身・下着女装OK', '○': '全身○ 下着×', '△': '全身× 下着○', '×': 'どちらも×' },
+  '外国人のお客様':       { '◎': 'どんな人でもOK', '○': '日本語が話せればOK', '△': '都度キャストに要確認', '×': 'どちらにしてもNG' },
+  '女装レズコース':       { '◎': 'OK', '×': 'NG' },
+};
+const choicesOf = k => OPT_CHOICES[k] ? Object.keys(OPT_CHOICES[k]) : ['◎','○','△','×'];
 const STEPS = 5;
 let cur = 0, info = null;
-let st = { profile: {}, options: {}, optMemo: {}, optTell: {}, announce: [], ng: '', hotel: '', notes: '', pq: {} };
+let st = { profile: {}, options: {}, optMemo: {}, announce: [], interval: '', hotel: '', notes: '', pq: {} };
 
 /* ---------- 読みこみ ---------- */
 async function load(){
@@ -218,7 +230,7 @@ async function load(){
   // はじめの中身：前に送った答え → このスマホの書きかけ → 公式HP
   const hp = info.hp || {};
   FIELDS.forEach(([k]) => { st.profile[k] = (hp.fields && hp.fields[k]) || ''; });
-  OPTS.forEach(([k, hk]) => { const v = hp.options ? (hp.options[k] || (hk && hp.options[hk]) || '') : ''; st.options[k] = ['◎','○','△','×'].includes(v) ? v : ''; });
+  OPTS.forEach(([k, hk]) => { const v = hp.options ? (hp.options[k] || (hk && hp.options[hk]) || '') : ''; st.options[k] = (!OPT_CHOICES[k] && choicesOf(k).includes(v)) ? v : ''; });   // 女装・外国人は意味が新しいので、公式HPからは入れない
   if(info.last) Object.assign(st, fromSaved(info.last));
   try{ const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); if(d && (!info.submittedAt || (d.savedAt && d.savedAt > Date.parse(info.submittedAt)))) Object.assign(st, d.st); }catch(e){}
 
@@ -230,8 +242,8 @@ function fatal(m){ $('loading').style.display = 'none'; const f = $('fatal'); f.
 function fromSaved(d){
   const pq = {};
   ((d.personalityAnswers && d.personalityAnswers.list) || []).forEach(a => { if(a.choice) pq[a.n] = { choice: a.choice, text: a.text || '' }; });
-  return { profile: d.profile || {}, options: d.options || {}, optMemo: d.optMemo || {}, optTell: d.optTell || {},
-           announce: d.mustAnnounce || [], ng: d.ng || '', hotel: d.hotel || '', notes: d.notes || '', pq };
+  return { profile: d.profile || {}, options: d.options || {}, optMemo: d.optMemo || {},
+           announce: d.mustAnnounce || [], interval: d.interval == null ? '' : String(d.interval), hotel: d.hotel || '', notes: d.notes || '', pq };
 }
 function saveDraft(){ try{ localStorage.setItem(DRAFT_KEY, JSON.stringify({ savedAt: Date.now(), st })); }catch(e){} }
 
@@ -245,18 +257,14 @@ function build(){
 
   $('opts').innerHTML = OPTS.map(([k], i) => `<div class="opt" id="opt${i}">
       <div class="top"><div class="nm">${esc(k)}</div>
-        <div class="seg">${['◎','○','△','×'].map(v => `<input type="radio" name="o${i}" id="o${i}${v}" value="${v}" ${st.options[k] === v ? 'checked' : ''} onchange="setOpt(${i},'${v}')"><label for="o${i}${v}">${v}</label>`).join('')}</div></div>
-      <div class="tell ${st.options[k] === '×' ? 'show' : ''}" id="tell${i}">×のとき、受付でお客様に「できません」と伝えてほしいですか？
-        <div class="seg" style="margin-top:4px">
-          <input type="radio" name="t${i}" id="t${i}a" ${st.optTell[k] === 'tell' ? 'checked' : ''} onchange="setTell(${i},'tell')"><label for="t${i}a">伝えてほしい</label>
-          <input type="radio" name="t${i}" id="t${i}b" ${st.optTell[k] === 'notell' ? 'checked' : ''} onchange="setTell(${i},'notell')"><label for="t${i}b">伝えないでほしい</label>
-        </div></div>
+        <div class="seg">${choicesOf(k).map(v => `<input type="radio" name="o${i}" id="o${i}${v}" value="${v}" ${st.options[k] === v ? 'checked' : ''} onchange="setOpt(${i},'${v}')"><label for="o${i}${v}">${v}</label>`).join('')}</div></div>
+      ${OPT_CHOICES[k] && choicesOf(k).length > 2 ? `<div class="means">${choicesOf(k).map(v => `<b>${v}</b> ${esc(OPT_CHOICES[k][v])}`).join('<br>')}</div>` : ''}
       <input type="text" class="memo" maxlength="200" placeholder="補足があれば（例：本指名のみOK・最終枠のみ）" value="${esc(st.optMemo[k] || '')}" oninput="st.optMemo['${esc(k)}']=this.value;saveDraft()">
     </div>`).join('');
 
   renderAnnounce();
-  $('ng').value = st.ng; $('hotel').value = st.hotel; $('notes').value = st.notes;
-  ['ng','hotel','notes'].forEach(id => $(id).addEventListener('input', e => { st[id] = e.target.value; saveDraft(); }));
+  $('interval').value = st.interval; $('hotel').value = st.hotel; $('notes').value = st.notes;
+  ['interval','hotel','notes'].forEach(id => $(id).addEventListener(id === 'interval' ? 'change' : 'input', e => { st[id] = e.target.value; e.target.classList.remove('miss'); saveDraft(); }));
 
   $('pqTotal').textContent = PQ_QUESTIONS.length;
   $('pqList').innerHTML = PQ_QUESTIONS.map(q => {
@@ -269,8 +277,7 @@ function build(){
   }).join('');
   pqCount();
 }
-function setOpt(i, v){ const k = OPTS[i][0]; st.options[k] = v; $('tell' + i).classList.toggle('show', v === '×'); $('opt' + i).classList.remove('miss'); saveDraft(); }
-function setTell(i, v){ st.optTell[OPTS[i][0]] = v; $('opt' + i).classList.remove('miss'); saveDraft(); }
+function setOpt(i, v){ const k = OPTS[i][0]; st.options[k] = v; $('opt' + i).classList.remove('miss'); saveDraft(); }
 function renderAnnounce(){
   $('announce').innerHTML = st.announce.map((t, i) => `<div class="list-item"><input type="text" maxlength="200" value="${esc(t)}" oninput="st.announce[${i}]=this.value;saveDraft()">
     <button class="btn btn-g btn-s" type="button" onclick="st.announce.splice(${i},1);renderAnnounce();saveDraft()">消す</button></div>`).join('');
@@ -309,14 +316,14 @@ function check(n){
   if(n === 2){
     for(let i = 0; i < OPTS.length; i++){
       const k = OPTS[i][0];
-      if(!st.options[k]) return { msg: '「' + k + '」の ◎○△× を選んでください', el: $('opt' + i) };
-      if(st.options[k] === '×' && !st.optTell[k]) return { msg: '「' + k + '」は×なので、受付で伝えてほしいか・伝えないでほしいかを選んでください', el: $('opt' + i) };
+      if(!st.options[k]) return { msg: '「' + k + '」の ' + choicesOf(k).join('') + ' を選んでください', el: $('opt' + i) };
     }
   }
   if(n === 3){
     if($('announceNew').value.trim()) addAnnounce();
-    if(!st.ng.trim()) return { msg: '「今のNG」を書いてください（なければ「なし」）', el: $('ng') };
-    if(!st.notes.trim()) return { msg: '「そのほか、受付で気をつけてほしいこと」を書いてください（なければ「なし」）', el: $('notes') };
+    if(!st.announce.length) return { msg: '「受付時お客様に必ず確認・案内してほしいこと」を書いて「足す」を押してください（なければ「なし」）', el: $('announceNew') };
+    if(st.interval === '') return { msg: '「予約と予約の間（インターバル）」を選んでください', el: $('interval') };
+    if(!st.notes.trim()) return { msg: '「電話受付外でのご要望」を書いてください（なければ「なし」）', el: $('notes') };
   }
   if(n === 4){
     const q = PQ_QUESTIONS.find(x => !pqDone(x.n));
@@ -328,13 +335,14 @@ function check(n){
 /* ---------- 送る ---------- */
 function payload(){
   const r = pqCompute(st.pq);
-  const options = {}, optMemo = {}, optTell = {};
-  OPTS.forEach(([k]) => { options[k] = st.options[k] || ''; if((st.optMemo[k] || '').trim()) optMemo[k] = st.optMemo[k].trim(); if(st.options[k] === '×') optTell[k] = st.optTell[k] || ''; });
+  const options = {}, optMemo = {};
+  OPTS.forEach(([k]) => { options[k] = st.options[k] || ''; if((st.optMemo[k] || '').trim()) optMemo[k] = st.optMemo[k].trim(); });
   return {
-    form: 'existing-confirm-v1',
-    profile: st.profile, options, optMemo, optTell,
+    form: 'existing-confirm-v2',
+    profile: st.profile, options, optMemo, optMeaning: OPT_CHOICES,
     mustAnnounce: st.announce.map(s => s.trim()).filter(Boolean),
-    ng: st.ng.trim(), hotel: st.hotel.trim(), notes: st.notes.trim(),
+    interval: st.interval === '' ? null : Number(st.interval),
+    hotel: st.hotel.trim(), notes: st.notes.trim(),
     personalityAnswers: { list: PQ_QUESTIONS.map(q => ({ n: q.n, q: q.q, choice: (st.pq[q.n] || {}).choice || '', text: (st.pq[q.n] || {}).text || '' })), axisSummary: r.axisResults },
     personalityType: r.typeCode,
     hpProfile: info.hp ? info.hp.fields : null, hpOptions: info.hp ? info.hp.options : null,   // 照らし合わせ用（そのときの公式HP）
@@ -346,9 +354,10 @@ function summaryText(){
   const lines = ['【プロフィール】'];
   FIELDS.forEach(([k, l]) => lines.push(l.replace(/（.*$/, '') + '：' + (p.profile[k] || '')));
   lines.push('', '【オプション】');
-  OPTS.forEach(([k]) => lines.push(k + '：' + p.options[k] + (p.optTell[k] ? (p.optTell[k] === 'tell' ? '（受付で伝えてほしい）' : '（受付で伝えないでほしい）') : '') + (p.optMemo[k] ? '　' + p.optMemo[k] : '')));
-  lines.push('', '【受付でお客様に必ず案内してほしいこと】', ...(p.mustAnnounce.length ? p.mustAnnounce.map(s => '・' + s) : ['（なし）']));
-  lines.push('', '【今のNG】', p.ng, '', '【ホテル・エリアの希望】', p.hotel || '（なし）', '', '【そのほか、受付で気をつけてほしいこと】', p.notes);
+  OPTS.forEach(([k]) => lines.push(k + '：' + p.options[k] + (OPT_CHOICES[k] && OPT_CHOICES[k][p.options[k]] ? '（' + OPT_CHOICES[k][p.options[k]] + '）' : '') + (p.optMemo[k] ? '　' + p.optMemo[k] : '')));
+  lines.push('', '【受付時お客様に必ず確認・案内してほしいこと】', ...(p.mustAnnounce.length ? p.mustAnnounce.map(s => '・' + s) : ['（なし）']));
+  lines.push('', '【予約と予約の間】', p.interval ? p.interval + '分' : 'なし（続けてOK）');
+  lines.push('', '【ホテル・エリアの希望】', p.hotel || '（なし）', '', '【電話受付外でのご要望】', p.notes);
   lines.push('', '【性格タイプチェック】', PQ_QUESTIONS.filter(q => pqDone(q.n)).length + ' / ' + PQ_QUESTIONS.length + ' 問 回答済み');
   return lines.join('\n');
 }
