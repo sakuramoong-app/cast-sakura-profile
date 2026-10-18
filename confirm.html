@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>プロフ確認フォーム</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --pink:#FF8FAB; --pink-mid:#FFB3C6; --pink-soft:#FFE0EA; --pink-bg:#FFF5F8;
+  --mint-soft:#E8FBF2; --lav-soft:#F3EDFF; --yellow-soft:#FFF8D6;
+  --text:#3D2B35; --text-sub:#9A7D87; --border:#F0C8D5; --white:#fff; --error:#FF4D6D;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--pink-bg);color:var(--text);font-size:15px;line-height:1.7;}
+.wrap{max-width:560px;margin:0 auto;padding:16px 16px 120px;}
+.head{text-align:center;padding:18px 0 10px;}
+.head h1{font-size:20px;font-weight:900;color:#E5638C;}
+.head .who{font-size:13px;color:var(--text-sub);}
+.bar{position:sticky;top:0;z-index:10;background:var(--pink-bg);padding:8px 0;}
+.bar .track{height:8px;background:var(--pink-soft);border-radius:99px;overflow:hidden;}
+.bar .fill{height:100%;background:var(--pink);width:0;transition:width .2s;}
+.bar .lbl{font-size:12px;color:var(--text-sub);text-align:right;margin-top:2px;}
+.card{background:var(--white);border:1.5px solid var(--border);border-radius:16px;padding:16px;margin:12px 0;}
+.step{display:none;} .step.on{display:block;}
+.tag{display:inline-block;background:var(--pink-soft);color:#E5638C;font-size:12px;font-weight:700;border-radius:99px;padding:2px 10px;margin-bottom:6px;}
+h2{font-size:18px;font-weight:900;margin-bottom:6px;}
+.desc{font-size:13.5px;color:var(--text-sub);margin-bottom:10px;}
+.msg p{margin-bottom:10px;font-size:14.5px;}
+.msg ul{padding-left:1.2em;font-size:14px;} .msg li{margin-bottom:6px;}
+label.f{display:block;font-size:13px;font-weight:700;margin:12px 0 4px;}
+input[type=text],textarea{width:100%;font:inherit;font-size:16px;border:1.5px solid var(--border);border-radius:10px;padding:9px 11px;background:#FFFBFC;color:var(--text);}
+textarea{min-height:84px;resize:vertical;}
+input:focus,textarea:focus{outline:none;border-color:var(--pink);}
+.hint{font-size:12px;color:var(--text-sub);margin-top:3px;}
+.hpnote{background:var(--yellow-soft);border-radius:10px;padding:8px 12px;font-size:12.5px;margin-bottom:8px;}
+.opt{border-bottom:1px dashed var(--border);padding:10px 0;}
+.opt .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.opt .nm{flex:1;min-width:140px;font-weight:700;font-size:14.5px;}
+.seg{display:flex;gap:4px;}
+.seg input{display:none;}
+.seg label{display:inline-flex;align-items:center;justify-content:center;min-width:40px;height:38px;padding:0 8px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;font-weight:700;background:#fff;cursor:pointer;}
+.seg input:checked + label{background:var(--pink);border-color:var(--pink);color:#fff;}
+.tell{margin-top:8px;background:var(--lav-soft);border-radius:10px;padding:8px 10px;font-size:13px;display:none;}
+.tell.show{display:block;}
+.tell .seg label{font-size:13px;height:34px;}
+.memo{margin-top:6px;font-size:14px !important;padding:6px 10px !important;}
+.legend{font-size:12.5px;background:var(--mint-soft);border-radius:10px;padding:8px 12px;margin-bottom:6px;}
+.rowadd{display:flex;gap:6px;margin-top:6px;}
+.list-item{display:flex;gap:6px;align-items:center;margin-top:6px;}
+.list-item input{flex:1;}
+.btn{font:inherit;font-weight:700;border:none;border-radius:12px;padding:12px 18px;font-size:15px;cursor:pointer;white-space:nowrap;flex-shrink:0;}
+.btn-p{background:var(--pink);color:#fff;} .btn-g{background:#fff;color:var(--text);border:1.5px solid var(--border);}
+.btn-s{padding:6px 12px;font-size:13px;border-radius:10px;}
+.nav{position:fixed;left:0;right:0;bottom:0;background:rgba(255,245,248,.96);border-top:1px solid var(--border);padding:10px 16px calc(10px + env(safe-area-inset-bottom));}
+.nav .in{max-width:560px;margin:0 auto;display:flex;gap:10px;}
+.nav .btn{flex:1;}
+.pq{border:1.5px solid var(--border);border-radius:14px;padding:12px;margin:10px 0;background:#fff;}
+.pq .n{font-size:12px;font-weight:700;color:#E5638C;}
+.pq .q{font-weight:700;margin:2px 0 8px;font-size:14.5px;}
+.pq label.o{display:flex;gap:8px;align-items:flex-start;padding:8px;border-radius:10px;border:1.5px solid var(--pink-soft);margin-top:6px;font-size:14px;cursor:pointer;}
+.pq label.o input{margin-top:5px;}
+.pq .free{display:none;margin-top:6px;} .pq .free.show{display:block;}
+.err{color:var(--error);font-size:13px;font-weight:700;margin-top:8px;}
+.miss{outline:2px solid var(--error);outline-offset:2px;border-radius:10px;}
+.sum{white-space:pre-wrap;font-size:13px;background:var(--pink-bg);border-radius:10px;padding:10px;max-height:420px;overflow:auto;}
+.done{text-align:center;padding:40px 10px;}
+.done .big{font-size:48px;}
+.center{text-align:center;color:var(--text-sub);padding:40px 0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head"><h1>🌸 プロフ確認フォーム</h1><div class="who" id="who"></div></div>
+  <div class="bar" id="bar" style="display:none"><div class="track"><div class="fill" id="fill"></div></div><div class="lbl" id="lbl"></div></div>
+  <div id="loading" class="center">読みこみ中…</div>
+  <div id="fatal" class="center" style="display:none"></div>
+
+  <!-- 0：はじめに -->
+  <div class="step" id="s0">
+    <div class="card msg">
+      <div class="tag">はじめに</div>
+      <h2>キャストのみなさんへ🌸</h2>
+      <p>キャストさんごとの条件やOK・NGが増えてきたので、もっと正確に管理できるように、専用のアプリを作っています。</p>
+      <p>入力していただいた内容は、<b>お客様が好みのタイプのキャストさんと出会いやすくなる仕組み</b>に使います。そのためには、みなさんのデータが必要です。少し手間がかかりますが、ご協力をお願いします🙏</p>
+      <p><b>📝 お願い</b></p>
+      <ul>
+        <li>すでに内勤に伝えてあるNGや、「受付で必ず案内してね」とお願いしていることも、お手数ですが、<b>できるだけご自身の言葉で書いてください</b>。</li>
+        <li>内勤が持っている情報と照らし合わせたあと、<b>もう一度内容を見てもらい</b>、お互いの認識が合っているか確認させてください。</li>
+      </ul>
+      <p class="hint">途中でページを閉じても、このスマホなら書いたところまで残ります。送ったあとでも、同じURLから直して送り直せます。</p>
+    </div>
+  </div>
+
+  <!-- 1：プロフィール -->
+  <div class="step" id="s1">
+    <div class="card">
+      <div class="tag">STEP 1 / 5</div>
+      <h2>プロフィール</h2>
+      <div class="desc">今の公式HPの内容が入っています。<b>合っていればそのままでOK</b>。変わったところだけ直してください。</div>
+      <div id="profHp"></div>
+      <div id="profFields"></div>
+    </div>
+  </div>
+
+  <!-- 2：オプション -->
+  <div class="step" id="s2">
+    <div class="card">
+      <div class="tag">STEP 2 / 5</div>
+      <h2>オプション（できること）</h2>
+      <div class="desc">今の公式HPの内容が入っています。変えたいところだけ直してください。</div>
+      <div class="legend">◎ 得意・大歓迎　○ できる　△ 条件つき・内容による　× できない<br>
+        <b>×にしたもの</b>は、受付でお客様に「できません」と<b>伝えてほしいか・伝えないでほしいか</b>も選んでください。</div>
+      <div id="opts"></div>
+    </div>
+  </div>
+
+  <!-- 3：受付へのお願い -->
+  <div class="step" id="s3">
+    <div class="card">
+      <div class="tag">STEP 3 / 5</div>
+      <h2>受付へのお願い</h2>
+      <div class="desc">内勤にもう伝えてあることも、<b>ご自身の言葉で</b>書いてください。なければ「なし」でOKです。</div>
+
+      <label class="f">📣 受付でお客様に必ず案内してほしいこと</label>
+      <div class="hint">1つずつ足してください。例：「射精は有料オプションです」「必ず一緒にシャワーに入ります」</div>
+      <div id="announce"></div>
+      <div class="rowadd"><input type="text" id="announceNew" maxlength="200" placeholder="案内してほしいことを書いて「足す」">
+        <button class="btn btn-g btn-s" type="button" onclick="addAnnounce()">足す</button></div>
+
+      <label class="f">🙅 今のNG（お客様・プレイ・その他） <span style="color:var(--error)">＊</span></label>
+      <textarea id="ng" maxlength="2000" placeholder="例：酔っているお客様はNG／カップルNG／自宅への出張はNG"></textarea>
+
+      <label class="f">🏨 ホテル・エリアの希望（NG・苦手・好きなところ）</label>
+      <textarea id="hotel" maxlength="1000" placeholder="例：○○ホテルはハウスダストがつらいのでNG／鶯谷以外はタクシー移動したい"></textarea>
+
+      <label class="f">📝 そのほか、受付で気をつけてほしいこと <span style="color:var(--error)">＊</span></label>
+      <textarea id="notes" maxlength="2000" placeholder="例：外国人のお客様は、日本語で話せるか電話で確認してから、私にも確認してほしい／新規のお客様は、ホテルに入ったら在室確認してほしい／予約と予約の間は30分あけてほしい"></textarea>
+    </div>
+  </div>
+
+  <!-- 4：性格タイプ -->
+  <div class="step" id="s4">
+    <div class="card">
+      <div class="tag">STEP 4 / 5</div>
+      <h2>かんたん性格タイプチェック</h2>
+      <div class="desc">あまり深く考えすぎず、「どちらかといえば自然に近い」と思う方を選んでください。<br>A・Bのどちらにも当てはまらない場合や、別の考え方をする場合は、Cに自由入力してください。</div>
+      <div class="hint"><span id="pqCount">0</span> / <span id="pqTotal"></span> 問 回答済み</div>
+      <div id="pqList"></div>
+    </div>
+  </div>
+
+  <!-- 5：確認して送る -->
+  <div class="step" id="s5">
+    <div class="card">
+      <div class="tag">STEP 5 / 5</div>
+      <h2>確認して送る</h2>
+      <div class="desc">内容を確認して「送る」を押してください。</div>
+      <div class="sum" id="summary"></div>
+    </div>
+  </div>
+
+  <!-- 送った -->
+  <div class="step" id="sDone">
+    <div class="card done">
+      <div class="big">🌸</div>
+      <h2>送りました！ご協力ありがとうございます</h2>
+      <p class="desc">内勤が内容を照らし合わせたあと、もう一度確認のご連絡をします。<br>直したいところがあれば、同じURLからいつでも送り直せます。</p>
+      <button class="btn btn-g" type="button" onclick="go(1)">内容を見直す</button>
+    </div>
+  </div>
+</div>
+
+<div class="nav" id="nav" style="display:none"><div class="in">
+  <button class="btn btn-g" type="button" id="back" onclick="go(cur - 1)">← もどる</button>
+  <button class="btn btn-p" type="button" id="next" onclick="nextStep()">はじめる →</button>
+</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="pq_questions.js"></script>
+<script>
+const sb = supabase.createClient("https://tuxqpqokbvkrckgxcfdn.supabase.co", "sb_publishable_PyvCZHSzYlaqauYbdZybng_zbftghak",
+  { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'sakura-prof-confirm' } });
+const TOKEN = new URLSearchParams(location.search).get('t') || '';
+const DRAFT_KEY = 'profConfirmDraft_' + TOKEN.slice(0, 12);
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// プロフィールの項目（公式HPと同じ）
+const FIELDS = [
+  ['age','年齢'], ['size','サイズ（T身長-Bバスト(カップ)-Wウエスト-Hヒップ）'], ['psize','Pサイズ'], ['state','状態（竿/玉）'],
+  ['hair','髪の毛'], ['personality','性格'], ['hobby','趣味'], ['erogenous','性感帯'], ['charm','チャームポイント'],
+];
+// オプション（プロフと同じ名前）。hp は公式HPでの書き方
+const OPTS = [
+  ['AF'], ['逆AF'], ['前立腺マッサージ'], ['兜合わせ'], ['玉舐め'], ['キス'], ['全身リップ'], ['乳首責め'], ['生フェラ'],
+  ['69'], ['Sプレイ'], ['Mプレイ'], ['お泊りコース'], ['デートコース'],
+  ['キャスト射精（有料）'], ['コース内キャスト2回以上射精（有料）'],
+  ['3P／お客様2名（有料）', '3P（有料）'], ['3P／キャスト2名（有料）', '3P（有料）'],
+  ['コスプレ（有料）'], ['ごっくん（有料）'], ['聖水（有料）'], ['女装されているお客様'], ['外国人のお客様'],
+];
+const STEPS = 5;
+let cur = 0, info = null;
+let st = { profile: {}, options: {}, optMemo: {}, optTell: {}, announce: [], ng: '', hotel: '', notes: '', pq: {} };
+
+/* ---------- 読みこみ ---------- */
+async function load(){
+  if(!/^[0-9a-f]{20,64}$/.test(TOKEN)){ fatal('URLが正しくありません。内勤からもらったURLをそのまま開いてください。'); return; }
+  try{
+    const { data, error } = await sb.rpc('prof_confirm_get', { p_token: TOKEN });
+    if(error) throw error;
+    if(!data || data.result !== 'ok'){ fatal((data && data.message) || '開けませんでした'); return; }
+    info = data;
+  }catch(e){ fatal('読みこめませんでした。電波のよいところで開き直してください。'); return; }
+
+  $('who').textContent = info.name + ' さん' + ((info.stores || []).length ? '（' + info.stores.join('・') + '）' : '');
+  // はじめの中身：前に送った答え → このスマホの書きかけ → 公式HP
+  const hp = info.hp || {};
+  FIELDS.forEach(([k]) => { st.profile[k] = (hp.fields && hp.fields[k]) || ''; });
+  OPTS.forEach(([k, hk]) => { const v = hp.options ? (hp.options[k] || (hk && hp.options[hk]) || '') : ''; st.options[k] = ['◎','○','△','×'].includes(v) ? v : ''; });
+  if(info.last) Object.assign(st, fromSaved(info.last));
+  try{ const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); if(d && (!info.submittedAt || (d.savedAt && d.savedAt > Date.parse(info.submittedAt)))) Object.assign(st, d.st); }catch(e){}
+
+  build();
+  $('loading').style.display = 'none'; $('nav').style.display = ''; $('bar').style.display = '';
+  go(0);
+}
+function fatal(m){ $('loading').style.display = 'none'; const f = $('fatal'); f.style.display = ''; f.textContent = m; }
+function fromSaved(d){
+  const pq = {};
+  ((d.personalityAnswers && d.personalityAnswers.list) || []).forEach(a => { if(a.choice) pq[a.n] = { choice: a.choice, text: a.text || '' }; });
+  return { profile: d.profile || {}, options: d.options || {}, optMemo: d.optMemo || {}, optTell: d.optTell || {},
+           announce: d.mustAnnounce || [], ng: d.ng || '', hotel: d.hotel || '', notes: d.notes || '', pq };
+}
+function saveDraft(){ try{ localStorage.setItem(DRAFT_KEY, JSON.stringify({ savedAt: Date.now(), st })); }catch(e){} }
+
+/* ---------- 画面を組み立てる ---------- */
+function build(){
+  const hp = info.hp;
+  $('profHp').innerHTML = hp ? `<div class="hpnote">公式HPの内容から入れています（<a href="${esc(hp.url)}" target="_blank" rel="noopener">公式HPを見る</a>）</div>`
+                             : `<div class="hpnote">公式HPの内容が見つからなかったので、空欄になっています。わかるところを入れてください。</div>`;
+  $('profFields').innerHTML = FIELDS.map(([k, label]) => `<label class="f">${esc(label)}</label>
+    <input type="text" maxlength="200" value="${esc(st.profile[k] || '')}" oninput="st.profile['${k}']=this.value;saveDraft()">`).join('');
+
+  $('opts').innerHTML = OPTS.map(([k], i) => `<div class="opt" id="opt${i}">
+      <div class="top"><div class="nm">${esc(k)}</div>
+        <div class="seg">${['◎','○','△','×'].map(v => `<input type="radio" name="o${i}" id="o${i}${v}" value="${v}" ${st.options[k] === v ? 'checked' : ''} onchange="setOpt(${i},'${v}')"><label for="o${i}${v}">${v}</label>`).join('')}</div></div>
+      <div class="tell ${st.options[k] === '×' ? 'show' : ''}" id="tell${i}">受付でお客様に「できません」と…
+        <div class="seg" style="margin-top:4px">
+          <input type="radio" name="t${i}" id="t${i}a" ${st.optTell[k] === 'tell' ? 'checked' : ''} onchange="setTell(${i},'tell')"><label for="t${i}a">伝えてほしい</label>
+          <input type="radio" name="t${i}" id="t${i}b" ${st.optTell[k] === 'notell' ? 'checked' : ''} onchange="setTell(${i},'notell')"><label for="t${i}b">伝えないでほしい</label>
+        </div></div>
+      <input type="text" class="memo" maxlength="200" placeholder="補足があれば（例：本指名のみOK・最終枠のみ）" value="${esc(st.optMemo[k] || '')}" oninput="st.optMemo['${esc(k)}']=this.value;saveDraft()">
+    </div>`).join('');
+
+  renderAnnounce();
+  $('ng').value = st.ng; $('hotel').value = st.hotel; $('notes').value = st.notes;
+  ['ng','hotel','notes'].forEach(id => $(id).addEventListener('input', e => { st[id] = e.target.value; saveDraft(); }));
+
+  $('pqTotal').textContent = PQ_QUESTIONS.length;
+  $('pqList').innerHTML = PQ_QUESTIONS.map(q => {
+    const a = st.pq[q.n] || {};
+    return `<div class="pq" id="pq${q.n}"><div class="n">Q${q.n}</div><div class="q">${esc(q.q)}</div>
+      ${['A','B','C'].map(c => `<label class="o"><input type="radio" name="pq${q.n}" value="${c}" ${a.choice === c ? 'checked' : ''} onchange="setPq(${q.n},'${c}')">
+        <span>${c}：${esc(c === 'A' ? q.a : c === 'B' ? q.b : '自由回答')}</span></label>`).join('')}
+      <div class="free ${a.choice === 'C' ? 'show' : ''}" id="pqf${q.n}"><textarea rows="2" maxlength="300" placeholder="AにもBにも当てはまらない場合や、別の考え方をする場合はこちらに"
+        oninput="setPqText(${q.n},this.value)">${esc(a.choice === 'C' ? a.text : '')}</textarea></div></div>`;
+  }).join('');
+  pqCount();
+}
+function setOpt(i, v){ const k = OPTS[i][0]; st.options[k] = v; $('tell' + i).classList.toggle('show', v === '×'); $('opt' + i).classList.remove('miss'); saveDraft(); }
+function setTell(i, v){ st.optTell[OPTS[i][0]] = v; $('opt' + i).classList.remove('miss'); saveDraft(); }
+function renderAnnounce(){
+  $('announce').innerHTML = st.announce.map((t, i) => `<div class="list-item"><input type="text" maxlength="200" value="${esc(t)}" oninput="st.announce[${i}]=this.value;saveDraft()">
+    <button class="btn btn-g btn-s" type="button" onclick="st.announce.splice(${i},1);renderAnnounce();saveDraft()">消す</button></div>`).join('');
+}
+function addAnnounce(){ const v = $('announceNew').value.trim(); if(!v) return; st.announce.push(v); $('announceNew').value = ''; renderAnnounce(); saveDraft(); }
+function setPq(n, c){
+  const q = PQ_QUESTIONS.find(x => x.n === n);
+  st.pq[n] = c === 'C' ? { choice: 'C', text: (st.pq[n] && st.pq[n].choice === 'C') ? st.pq[n].text : '' } : { choice: c, text: c === 'A' ? q.a : q.b };
+  $('pqf' + n).classList.toggle('show', c === 'C'); $('pq' + n).classList.remove('miss'); pqCount(); saveDraft();
+}
+function setPqText(n, v){ if(st.pq[n] && st.pq[n].choice === 'C'){ st.pq[n].text = v; pqCount(); saveDraft(); } }
+function pqDone(n){ const a = st.pq[n]; return a && a.choice && (a.choice !== 'C' || (a.text || '').trim()); }
+function pqCount(){ $('pqCount').textContent = PQ_QUESTIONS.filter(q => pqDone(q.n)).length; }
+
+/* ---------- すすむ・もどる ---------- */
+function go(n){
+  if(n < 0) n = 0;
+  cur = n;
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('on'));
+  $(n === 'done' ? 'sDone' : 's' + n).classList.add('on');
+  $('fill').style.width = (n === 'done' ? 100 : Math.round(n / STEPS * 100)) + '%';
+  $('lbl').textContent = n === 'done' ? '送りました' : n === 0 ? 'はじめに' : `STEP ${n} / ${STEPS}`;
+  $('nav').style.display = n === 'done' ? 'none' : '';
+  $('back').style.visibility = n === 0 ? 'hidden' : 'visible';
+  $('next').textContent = n === 0 ? 'はじめる →' : n === STEPS ? '📨 送る' : '次へ →';
+  if(n === STEPS) $('summary').textContent = summaryText();
+  window.scrollTo(0, 0);
+}
+function nextStep(){
+  const err = check(cur);
+  if(err){ alert(err.msg); if(err.el){ err.el.classList.add('miss'); err.el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } return; }
+  if(cur === STEPS){ submit(); return; }
+  go(cur + 1);
+}
+function check(n){
+  if(n === 2){
+    for(let i = 0; i < OPTS.length; i++){
+      const k = OPTS[i][0];
+      if(!st.options[k]) return { msg: '「' + k + '」の ◎○△× を選んでください', el: $('opt' + i) };
+      if(st.options[k] === '×' && !st.optTell[k]) return { msg: '「' + k + '」は×なので、受付で伝えてほしいか・伝えないでほしいかを選んでください', el: $('opt' + i) };
+    }
+  }
+  if(n === 3){
+    if($('announceNew').value.trim()) addAnnounce();
+    if(!st.ng.trim()) return { msg: '「今のNG」を書いてください（なければ「なし」）', el: $('ng') };
+    if(!st.notes.trim()) return { msg: '「そのほか、受付で気をつけてほしいこと」を書いてください（なければ「なし」）', el: $('notes') };
+  }
+  if(n === 4){
+    const q = PQ_QUESTIONS.find(x => !pqDone(x.n));
+    if(q) return { msg: 'Q' + q.n + ' がまだです' + (st.pq[q.n] && st.pq[q.n].choice === 'C' ? '（Cを選んだら、自由回答に書いてください）' : ''), el: $('pq' + q.n) };
+  }
+  return null;
+}
+
+/* ---------- 送る ---------- */
+function payload(){
+  const r = pqCompute(st.pq);
+  const options = {}, optMemo = {}, optTell = {};
+  OPTS.forEach(([k]) => { options[k] = st.options[k] || ''; if((st.optMemo[k] || '').trim()) optMemo[k] = st.optMemo[k].trim(); if(st.options[k] === '×') optTell[k] = st.optTell[k] || ''; });
+  return {
+    form: 'existing-confirm-v1',
+    profile: st.profile, options, optMemo, optTell,
+    mustAnnounce: st.announce.map(s => s.trim()).filter(Boolean),
+    ng: st.ng.trim(), hotel: st.hotel.trim(), notes: st.notes.trim(),
+    personalityAnswers: { list: PQ_QUESTIONS.map(q => ({ n: q.n, q: q.q, choice: (st.pq[q.n] || {}).choice || '', text: (st.pq[q.n] || {}).text || '' })), axisSummary: r.axisResults },
+    personalityType: r.typeCode,
+    hpProfile: info.hp ? info.hp.fields : null, hpOptions: info.hp ? info.hp.options : null,   // 照らし合わせ用（そのときの公式HP）
+    submittedAt: new Date().toISOString(),
+  };
+}
+function summaryText(){
+  const p = payload();
+  const lines = ['【プロフィール】'];
+  FIELDS.forEach(([k, l]) => lines.push(l.replace(/（.*$/, '') + '：' + (p.profile[k] || '')));
+  lines.push('', '【オプション】');
+  OPTS.forEach(([k]) => lines.push(k + '：' + p.options[k] + (p.optTell[k] ? (p.optTell[k] === 'tell' ? '（受付で伝えてほしい）' : '（受付で伝えないでほしい）') : '') + (p.optMemo[k] ? '　' + p.optMemo[k] : '')));
+  lines.push('', '【受付でお客様に必ず案内してほしいこと】', ...(p.mustAnnounce.length ? p.mustAnnounce.map(s => '・' + s) : ['（なし）']));
+  lines.push('', '【今のNG】', p.ng, '', '【ホテル・エリアの希望】', p.hotel || '（なし）', '', '【そのほか、受付で気をつけてほしいこと】', p.notes);
+  lines.push('', '【性格タイプチェック】', PQ_QUESTIONS.filter(q => pqDone(q.n)).length + ' / ' + PQ_QUESTIONS.length + ' 問 回答済み');
+  return lines.join('\n');
+}
+let sending = false;
+async function submit(){
+  if(sending) return; sending = true; $('next').disabled = true; $('next').textContent = '送っています…';
+  try{
+    const { data, error } = await sb.rpc('prof_confirm_submit', { p_token: TOKEN, p: payload() });
+    if(error) throw error;
+    if(!data || data.result !== 'ok') throw new Error((data && data.message) || '送れませんでした');
+    try{ localStorage.removeItem(DRAFT_KEY); }catch(e){}
+    info.submittedAt = new Date().toISOString();
+    go('done');
+  }catch(e){ alert('送れませんでした：' + (e.message || e) + '\n電波のよいところで、もう一度「送る」を押してください。'); }
+  finally{ sending = false; $('next').disabled = false; if(cur === STEPS) $('next').textContent = '📨 送る'; }
+}
+load();
+</script>
+</body>
+</html>
