@@ -4658,6 +4658,9 @@ async function manualReload() {
 async function init() {
   renderSidebar(); // キャッシュから即表示
   await loadFromGAS();
+  // 記録簿などから「?cast=プロフのID」で開いたときは、そのキャストを開く
+  const want = new URLSearchParams(location.search).get('cast');
+  if (want && casts.some(c => String(c.id) === want)) selectCast(want);
 }
 
 async function loadFromGAS() {
