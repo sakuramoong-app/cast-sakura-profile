@@ -3448,6 +3448,10 @@ const HP_BTN = 'padding:10px 14px;border-radius:10px;font-size:13px;font-weight:
 const hpCloseBtn = (label = 'とじる') => `<button onclick="document.getElementById('hp-import-overlay').remove()" style="${HP_BTN}border:1.5px solid #ddd;background:#fff;color:#666">${label}</button>`;
 const hpShort = s => { s = String(s || ''); return esc(s.length > 60 ? s.slice(0, 60) + '…' : s).replace(/\n/g, ' '); };
 
+// 「全部チェック／全部はずす」（selector は属性の中に入るので " は &quot; で渡す）
+const hpAllChk = sel => ['全部チェック', '全部はずす'].map((l, k) =>
+  `<button type="button" onclick="document.querySelectorAll('${sel}').forEach(c => c.checked = ${k === 0})" style="font-size:11px;padding:3px 10px;margin-right:6px;border-radius:8px;border:1px solid #d9b860;background:#fff;color:#9a7000;cursor:pointer;font-family:inherit">${l}</button>`).join('');
+
 // ---------- 1人分 ----------
 let hpPlan = null;
 async function openHpImport() {
@@ -3476,7 +3480,8 @@ async function openHpImport() {
     if (x.error) return head + `<div style="color:#c00">⚠️ ${esc(x.error)}</div>`;
     if (!x.auto.length && !x.ask.length) return head + `<div style="color:#1a6640">✅ もう同じ内容です</div>`;
     const auto = x.auto.length ? `<div style="background:#f0fff4;border-radius:8px;padding:8px 10px;margin-bottom:6px"><div style="font-weight:700;color:#1a6640;margin-bottom:4px">空なので入れる（${x.auto.length}）</div>${x.auto.map(it => `<div>・${esc(it.label)}：${hpShort(it.v)}</div>`).join('')}</div>` : '';
-    const ask = x.ask.length ? `<div style="background:#fffaf0;border-radius:8px;padding:8px 10px"><div style="font-weight:700;color:#9a7000;margin-bottom:4px">もう入っている欄（チェックしたものだけ公式HPの内容で上書き）</div>${x.ask.map((it, j) => `
+    const ask = x.ask.length ? `<div style="background:#fffaf0;border-radius:8px;padding:8px 10px"><div style="font-weight:700;color:#9a7000;margin-bottom:4px">もう入っている欄（チェックしたものだけ公式HPの内容で上書き）</div>
+      <div style="margin-bottom:4px">${hpAllChk(`.hp-ask-chk[data-i=&quot;${i}&quot;]`)}</div>${x.ask.map((it, j) => `
       <label style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-top:1px solid #f3e6c8;cursor:pointer">
         <input type="checkbox" class="hp-ask-chk" data-i="${i}" data-j="${j}" style="margin-top:3px;width:15px;height:15px">
         <span><b>${esc(it.label)}</b><br><span style="color:#888">いま：</span>${hpShort(it.cur)}<br><span style="color:#c2185b">公式HP：</span>${hpShort(it.v)}</span>
@@ -3485,7 +3490,9 @@ async function openHpImport() {
     return head + auto + ask + unk;
   }).join('');
   const any = plan.some(x => x.auto && (x.auto.length || x.ask.length));
-  body.innerHTML = rows + `
+  const askAll = plan.some(x => x.ask && x.ask.length)
+    ? `<div style="background:#fffaf0;border-radius:8px;padding:6px 10px;margin-bottom:4px">もう入っている欄を、ぜんぶのお店まとめて：${hpAllChk('.hp-ask-chk')}</div>` : '';
+  body.innerHTML = askAll + rows + `
     <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
       ${any ? `<button onclick="applyHpImport()" style="${HP_BTN}flex:1;border:none;background:var(--pink);color:#fff">この内容で入れる</button>` : ''}
       ${hpCloseBtn(any ? 'やめる' : 'とじる')}
