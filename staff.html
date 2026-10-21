@@ -3235,7 +3235,12 @@ function renderStoreTabs(cast) {
       padding:6px 12px;border-radius:10px;font-size:12px;font-weight:700;
       border:1.5px solid var(--pink);background:var(--pink);color:#fff;
       cursor:pointer;font-family:inherit;transition:all .2s;flex-shrink:0;
-    ">📋 他店舗へ一括反映</button>`;
+    ">📋 他店舗へ一括反映</button>
+    <button onclick="openHpImport()" style="
+      padding:6px 12px;border-radius:10px;font-size:12px;font-weight:700;
+      border:1.5px solid #1a73e8;background:#fff;color:#1a73e8;
+      cursor:pointer;font-family:inherit;transition:all .2s;flex-shrink:0;
+    ">🌐 公式HPから取りこむ</button>`;
 }
 
 function selectStoretab(storeKey) {
@@ -3322,6 +3327,255 @@ function saveStoreSettings() {
   document.getElementById('store-modal-overlay').remove();
   renderStoreTabs(cast);
   showToast('✅ 店舗設定を保存しました');
+}
+
+// =========================================================
+//  公式HPから取りこむ（公式HPの管理画面のプロフ → このアプリの店舗別プロフ）
+//  空の欄は自動で埋める。もう入っている欄は並べて見せて、チェックしたものだけ上書き
+// =========================================================
+const HP_PROF_STORES = {   // このアプリの店舗キー → 管理画面ロボットのお店（キャスト台帳 stores のキー）
+  'サクラムーン':'sakuramoon', 'ラナ鶯谷':'lana_uguisu', 'ラナ錦糸町':'lana_kinshi', 'ドレスガーデン':'dressgarden',
+  'ピーチムーン五反田':'peachmoon', '逆AF倶楽部':'gyakuanal', 'キューティー':'cutie', '18':'eighteen', '極門':'gokumon',
+};
+const HP_PROF_FIELDS = [
+  {field:'name',label:'源氏名'}, {field:'age',label:'年齢'}, {field:'size',label:'３サイズ'}, {field:'psize',label:'Pサイズ'},
+  {field:'state',label:'状態（竿/玉）'}, {field:'hair',label:'髪の毛'}, {field:'personality',label:'性格'}, {field:'hobby',label:'趣味'},
+  {field:'charm',label:'チャームポイント'}, {field:'erogenous',label:'性感帯'},
+  {field:'comment',label:'キャストからひとこと（素材）'}, {field:'mgrComment',label:'店長から一言'},
+];
+// 公式HPのオプション名 → このアプリのオプション（「女装されているお客様（必ず事前に…）」のように後ろに説明がついていても）
+function hpOptKey(title) {
+  const t = String(title).replace(/\s+/g, '');
+  if (t === '3P（有料）') return '3P／お客様2名（有料）';   // 公式HPは1つだけ。お客様2名のほうに入れる（きゃ 10/22）
+  for (const [key, label] of Object.entries(OPT_LABEL_MAP)) if (t === label || t === key) return key;
+  for (const [key, label] of Object.entries(OPT_LABEL_MAP)) if (t.startsWith(label + '（')) return key;
+  return '';
+}
+async function hpCallFn(body) {
+  const { data, error } = await ProfDB.client.functions.invoke('hp-shift-sync', { body });
+  let r = data;
+  if (error) { try { r = await error.context.json(); } catch (e) { r = { ok: false, error: error.message }; } }
+  return r || { ok: false, error: '返事がありません' };
+}
+// キャスト台帳から、お店ごとの公式HPの在籍番号（18・極門はシフトで選んだ番号も見る）
+function hpNosOf(masterRows, dummyRows, castId) {
+  const m = masterRows.find(r => String(r.prof_id) === String(castId));
+  const out = {};
+  if (!m) return out;
+  for (const { key: sk } of STORES) {   // 「18」は数字のキーなので Object.entries だと先頭に来てしまう。お店の並びはSTORESの順で
+    const hk = HP_PROF_STORES[sk];
+    if (!hk) continue;
+    let no = Number(m.stores && m.stores[hk] && m.stores[hk].siteNo) || 0;
+    if (!no && m.shift_name) { const d = dummyRows.find(x => x.store_key === hk && x.cast_name === m.shift_name); if (d) no = Number(d.no) || 0; }
+    if (no) out[sk] = no;
+  }
+  return out;
+}
+async function hpLoadMaster() {
+  const sb = ProfDB.client;
+  const [m, d] = await Promise.all([
+    sb.from('master_casts').select('prof_id,shift_name,stores').not('prof_id', 'is', null),
+    sb.from('hp_dummy_map').select('store_key,cast_name,no'),
+  ]);
+  if (m.error) throw new Error('キャスト台帳が読めませんでした：' + m.error.message);
+  return { master: m.data || [], dummy: d.data || [] };
+}
+// 1人・1店舗分の「入れるもの」：auto＝空なので自動、ask＝もう入っているので選ぶ
+function hpDiff(cast, storeKey, p) {
+  const auto = [], ask = [], unknownOpts = [];
+  for (const { field, label } of HP_PROF_FIELDS) {
+    const v = String(p[field] || '').trim(), cur = String(getField(cast, storeKey, field) || '').trim();
+    if (!v || v === cur) continue;
+    (cur ? ask : auto).push({ kind: 'field', field, label, cur, v });
+  }
+  const curOpts = getStoreOptions(cast, storeKey).options || {};
+  for (const [title, v] of Object.entries(p.options || {})) {
+    const key = hpOptKey(title);
+    if (!key) { unknownOpts.push(title); continue; }
+    const cur = curOpts[key] || '';
+    if (!v || v === cur) continue;
+    (cur ? ask : auto).push({ kind: 'opt', field: key, label: 'オプション：' + key, cur, v });
+  }
+  return { auto, ask, unknownOpts };
+}
+function hpApplyItem(cast, storeKey, it) {
+  if (it.kind === 'opt') {
+    // サクラムーンで店舗別のオプションがまだ空なら、旧データの可否を先に写す（1つだけ入れると、ほかの可否が見えなくなるため）
+    const sp = cast.storeProfiles && cast.storeProfiles[storeKey];
+    if (storeKey === 'サクラムーン' && !(sp && sp.options && Object.keys(sp.options).length))
+      Object.entries(cast.options || {}).forEach(([k, v]) => setStoreOption(cast, storeKey, k, v));
+    setStoreOption(cast, storeKey, it.field, it.v);
+  }
+  else setField(cast, storeKey, it.field, it.v);
+}
+async function hpSaveCast(cast) {
+  const form = new FormData();
+  form.append('payload', JSON.stringify({
+    _type:        'updateConfirmed',
+    _token:       generateGasToken(),
+    id:           String(cast.id),
+    name:         cast.name,
+    status:       cast.status,
+    castComment:  cast.generatedCastComment || '',
+    comment:      getField(cast, 'サクラムーン', 'comment')    || '',
+    mgrComment:   getField(cast, 'サクラムーン', 'mgrComment') || '',
+    internal:     getField(cast, 'サクラムーン', 'internal')   || '',
+    options:      cast.options  || {},
+    optMemo:      cast.optMemo  || {},
+    backData:      cast.backData      || {},
+    honshimei:     cast.honshimei     || {},
+    storeProfiles: cast.storeProfiles || {},
+    interviewDate: cast.interviewDate || '',
+    joinDate:      cast.joinDate      || '',
+    joinReason:    cast.joinReason    || '',
+    hotelPrefs:    cast.hotelPrefs    || { ok: [], ng: [], conditional: [], memo: {} },
+  }));
+  await profFetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: form });
+}
+function hpModal(title) {
+  document.getElementById('hp-import-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'hp-import-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  const modal = document.createElement('div');
+  modal.style.cssText = 'background:#fff;border-radius:16px;padding:20px;width:100%;max-width:640px;max-height:88vh;overflow:auto;box-shadow:0 8px 32px rgba(0,0,0,.2)';
+  modal.innerHTML = `<div style="font-size:16px;font-weight:800;color:#333;margin-bottom:10px">${title}</div><div id="hp-import-body" style="font-size:13px;color:#333">公式HPを読んでいます…</div>`;
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  return document.getElementById('hp-import-body');
+}
+const HP_BTN = 'padding:10px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;';
+const hpCloseBtn = (label = 'とじる') => `<button onclick="document.getElementById('hp-import-overlay').remove()" style="${HP_BTN}border:1.5px solid #ddd;background:#fff;color:#666">${label}</button>`;
+const hpShort = s => { s = String(s || ''); return esc(s.length > 60 ? s.slice(0, 60) + '…' : s).replace(/\n/g, ' '); };
+
+// ---------- 1人分 ----------
+let hpPlan = null;
+async function openHpImport() {
+  const cast = casts.find(c => c.id === currentCastId);
+  if (!cast) return;
+  const body = hpModal('🌐 公式HPから取りこむ：' + esc(cast.name));
+  let nos;
+  try { const { master, dummy } = await hpLoadMaster(); nos = hpNosOf(master, dummy, cast.id); }
+  catch (e) { body.innerHTML = `<p style="color:#c00">${esc(e.message)}</p>${hpCloseBtn()}`; return; }
+  const keys = STORES.map(s => s.key).filter(k => nos[k]);
+  if (!keys.length) {
+    body.innerHTML = `<p>キャスト台帳にこの子の公式HPの在籍番号がありません。<br>キャスト台帳でお店ごとの「公式HPの在籍番号」を入れてから、もう一度押してください。</p>${hpCloseBtn()}`;
+    return;
+  }
+  const plan = [];
+  for (const sk of keys) {
+    body.innerHTML = `公式HPを読んでいます…（${plan.length + 1}／${keys.length}：${esc(STORE_LABEL_MAP[sk] || sk)}）`;
+    const r = await hpCallFn({ action: 'cast_profiles', store: HP_PROF_STORES[sk], nos: [nos[sk]] });
+    const p = r.ok && r.profiles && r.profiles[0];
+    if (!p || p.error) { plan.push({ sk, no: nos[sk], error: (p && p.error) || r.error || r.message || '読めませんでした' }); continue; }
+    plan.push({ sk, no: nos[sk], p, ...hpDiff(cast, sk, p) });
+  }
+  hpPlan = { castId: cast.id, plan };
+  const rows = plan.map((x, i) => {
+    const head = `<div style="font-weight:800;margin:14px 0 6px;color:#333">${esc(STORE_LABEL_MAP[x.sk] || x.sk)}　<span style="font-weight:400;color:#888">公式HP ${x.no}番${x.p ? '「' + esc(x.p.name) + '」' + (x.p.published ? '' : '（非公開）') : ''}</span></div>`;
+    if (x.error) return head + `<div style="color:#c00">⚠️ ${esc(x.error)}</div>`;
+    if (!x.auto.length && !x.ask.length) return head + `<div style="color:#1a6640">✅ もう同じ内容です</div>`;
+    const auto = x.auto.length ? `<div style="background:#f0fff4;border-radius:8px;padding:8px 10px;margin-bottom:6px"><div style="font-weight:700;color:#1a6640;margin-bottom:4px">空なので入れる（${x.auto.length}）</div>${x.auto.map(it => `<div>・${esc(it.label)}：${hpShort(it.v)}</div>`).join('')}</div>` : '';
+    const ask = x.ask.length ? `<div style="background:#fffaf0;border-radius:8px;padding:8px 10px"><div style="font-weight:700;color:#9a7000;margin-bottom:4px">もう入っている欄（チェックしたものだけ公式HPの内容で上書き）</div>${x.ask.map((it, j) => `
+      <label style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-top:1px solid #f3e6c8;cursor:pointer">
+        <input type="checkbox" class="hp-ask-chk" data-i="${i}" data-j="${j}" style="margin-top:3px;width:15px;height:15px">
+        <span><b>${esc(it.label)}</b><br><span style="color:#888">いま：</span>${hpShort(it.cur)}<br><span style="color:#c2185b">公式HP：</span>${hpShort(it.v)}</span>
+      </label>`).join('')}</div>` : '';
+    const unk = x.unknownOpts.length ? `<div style="color:#888;font-size:11px;margin-top:4px">このアプリにないオプション（入れません）：${x.unknownOpts.map(esc).join('・')}</div>` : '';
+    return head + auto + ask + unk;
+  }).join('');
+  const any = plan.some(x => x.auto && (x.auto.length || x.ask.length));
+  body.innerHTML = rows + `
+    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+      ${any ? `<button onclick="applyHpImport()" style="${HP_BTN}flex:1;border:none;background:var(--pink);color:#fff">この内容で入れる</button>` : ''}
+      ${hpCloseBtn(any ? 'やめる' : 'とじる')}
+    </div>
+    <div style="margin-top:14px;font-size:12px;color:#888">👥 全員の空いている欄をまとめて埋めるときは <a href="#" onclick="openHpImportAll();return false">こちら</a></div>`;
+}
+async function applyHpImport() {
+  if (!hpPlan) return;
+  const cast = casts.find(c => c.id === hpPlan.castId);
+  if (!cast) return;
+  let n = 0;
+  hpPlan.plan.forEach((x, i) => {
+    if (!x.auto) return;
+    x.auto.forEach(it => { hpApplyItem(cast, x.sk, it); n++; });
+    x.ask.forEach((it, j) => { if (document.querySelector(`.hp-ask-chk[data-i="${i}"][data-j="${j}"]`)?.checked) { hpApplyItem(cast, x.sk, it); n++; } });
+  });
+  if (!n) { showToast('入れるものがありません'); return; }
+  try { await hpSaveCast(cast); }
+  catch (e) { alert('保存できませんでした：' + (e.message || e)); return; }
+  saveCastsCache();
+  document.getElementById('hp-import-overlay')?.remove();
+  hpPlan = null;
+  selectCast(cast.id);
+  showToast(`🌐 公式HPから ${n} か所入れました`);
+}
+
+// ---------- 全員の空欄をまとめて ----------
+let hpAllPlan = null;
+async function openHpImportAll() {
+  const body = hpModal('🌐 全員の空いている欄を公式HPから埋める');
+  let master, dummy;
+  try { ({ master, dummy } = await hpLoadMaster()); }
+  catch (e) { body.innerHTML = `<p style="color:#c00">${esc(e.message)}</p>${hpCloseBtn()}`; return; }
+  const want = {};   // お店 → [{cast, no}]
+  for (const c of casts.filter(c => !c.retired)) {
+    for (const [sk, no] of Object.entries(hpNosOf(master, dummy, c.id))) (want[sk] = want[sk] || []).push({ cast: c, no });
+  }
+  const total = Object.values(want).reduce((a, v) => a + v.length, 0);
+  if (!total) { body.innerHTML = `<p>キャスト台帳に公式HPの在籍番号が入っている子がいません。</p>${hpCloseBtn()}`; return; }
+  const plan = [], errs = [];
+  let done = 0;
+  for (const sk of STORES.map(s => s.key).filter(k => want[k])) {
+    const arr = want[sk];
+    for (let k = 0; k < arr.length; k += 5) {
+      const chunk = arr.slice(k, k + 5);
+      body.innerHTML = `公式HPを読んでいます…（${done}／${total}人分）<br><span style="color:#888">お店：${esc(STORE_LABEL_MAP[sk] || sk)}。数分かかります。この画面のまま待ってください</span>`;
+      const r = await hpCallFn({ action: 'cast_profiles', store: HP_PROF_STORES[sk], nos: chunk.map(x => x.no) });
+      done += chunk.length;
+      if (!r.ok) { chunk.forEach(x => errs.push(`${x.cast.name}（${STORE_LABEL_MAP[sk] || sk}）：${r.error || r.message || '読めませんでした'}`)); continue; }
+      for (const x of chunk) {
+        const p = (r.profiles || []).find(q => Number(q.no) === Number(x.no));
+        if (!p || p.error) { errs.push(`${x.cast.name}（${STORE_LABEL_MAP[sk] || sk}）：${(p && p.error) || '読めませんでした'}`); continue; }
+        const d = hpDiff(x.cast, sk, p);
+        if (d.auto.length) plan.push({ castId: x.cast.id, name: x.cast.name, sk, auto: d.auto });
+      }
+    }
+  }
+  hpAllPlan = plan;
+  const byCast = {};
+  plan.forEach(x => { (byCast[x.name] = byCast[x.name] || []).push(`${STORE_LABEL_MAP[x.sk] || x.sk} ${x.auto.length}`); });
+  const n = plan.reduce((a, x) => a + x.auto.length, 0);
+  body.innerHTML = `
+    <p>空いている欄だけを埋めます（もう入っている欄はさわりません。上書きしたいときは1人ずつの「🌐 公式HPから取りこむ」で）。</p>
+    <div style="background:#f0fff4;border-radius:8px;padding:8px 10px;margin:8px 0">
+      <b>${Object.keys(byCast).length}人・${n}か所</b>
+      ${Object.entries(byCast).map(([nm, a]) => `<div>・${esc(nm)}：${a.map(esc).join('、')}</div>`).join('') || '<div>埋める欄はありませんでした</div>'}
+    </div>
+    ${errs.length ? `<details style="margin:8px 0"><summary style="cursor:pointer;color:#c00">⚠️ 読めなかった ${errs.length}件</summary>${errs.map(e => `<div style="font-size:12px">・${esc(e)}</div>`).join('')}</details>` : ''}
+    <div style="display:flex;gap:8px;margin-top:12px">
+      ${n ? `<button onclick="applyHpImportAll()" style="${HP_BTN}flex:1;border:none;background:var(--pink);color:#fff">この内容で空欄を埋める</button>` : ''}
+      ${hpCloseBtn(n ? 'やめる' : 'とじる')}
+    </div>`;
+}
+async function applyHpImportAll() {
+  if (!hpAllPlan) return;
+  const body = document.getElementById('hp-import-body');
+  const ids = [...new Set(hpAllPlan.map(x => x.castId))];
+  const fails = [];
+  let i = 0;
+  for (const id of ids) {
+    const cast = casts.find(c => c.id === id);
+    if (!cast) continue;
+    if (body) body.innerHTML = `保存しています…（${++i}／${ids.length}）`;
+    hpAllPlan.filter(x => x.castId === id).forEach(x => x.auto.forEach(it => hpApplyItem(cast, x.sk, it)));
+    try { await hpSaveCast(cast); } catch (e) { fails.push(cast.name); }
+  }
+  saveCastsCache();
+  hpAllPlan = null;
+  if (currentCastId) selectCast(currentCastId);
+  if (body) body.innerHTML = `<p>${fails.length ? `⚠️ ${ids.length - fails.length}人 保存しました。保存できなかった子：${fails.map(esc).join('・')}` : `✅ ${ids.length}人ぶん保存しました`}</p>${hpCloseBtn()}`;
 }
 
 // =========================================================
