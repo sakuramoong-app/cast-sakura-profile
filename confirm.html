@@ -96,7 +96,7 @@ select{font:inherit;font-size:16px;border:1.5px solid var(--border);border-radiu
   <!-- 1：プロフィール -->
   <div class="step" id="s1">
     <div class="card">
-      <div class="tag">STEP 1 / 6</div>
+      <div class="tag">STEP 1 / 5</div>
       <h2>プロフィール</h2>
       <div class="desc">今の公式HPの内容が入っています。<b>合っていればそのままでOK</b>。変わったところだけ直してください。</div>
       <div id="profHp"></div>
@@ -108,7 +108,7 @@ select{font:inherit;font-size:16px;border:1.5px solid var(--border);border-radiu
   <!-- 2：オプション -->
   <div class="step" id="s2">
     <div class="card">
-      <div class="tag">STEP 2 / 6</div>
+      <div class="tag">STEP 2 / 5</div>
       <h2>オプション（できること）</h2>
       <div class="desc">今の公式HPの内容が入っています。変えたいところだけ直してください。</div>
       <div class="legend">◎ 得意・大歓迎　○ できる　△ 条件つき・内容による　× できない<br>
@@ -125,7 +125,7 @@ select{font:inherit;font-size:16px;border:1.5px solid var(--border);border-radiu
   <!-- 3：受付へのお願い -->
   <div class="step" id="s3">
     <div class="card">
-      <div class="tag">STEP 3 / 6</div>
+      <div class="tag">STEP 3 / 5</div>
       <h2>受付へのお願い</h2>
       <div class="desc">内勤にもう伝えてあることも、<b>ご自身の言葉で</b>書いてください。<br>特別強調して、受付時にこちらから確認・案内をしてほしいことをご記入ください。<br>なければ「なし」でOKです。</div>
 
@@ -170,7 +170,7 @@ select{font:inherit;font-size:16px;border:1.5px solid var(--border);border-radiu
   <!-- 4：性格タイプ -->
   <div class="step" id="s4">
     <div class="card">
-      <div class="tag">STEP 4 / 6</div>
+      <div class="tag">STEP 4 / 5</div>
       <h2>かんたん性格タイプチェック</h2>
       <div class="desc">あまり深く考えすぎず、「どちらかといえば自然に近い」と思う方を選んでください。<br>A・Bのどちらにも当てはまらない場合や、別の考え方をする場合は、Cに自由入力してください。</div>
       <div class="hint"><span id="pqCount">0</span> / <span id="pqTotal"></span> 問 回答済み</div>
@@ -178,65 +178,10 @@ select{font:inherit;font-size:16px;border:1.5px solid var(--border);border-radiu
     </div>
   </div>
 
-  <!-- 5：写メ日記おまかせ投稿 -->
+  <!-- 5：確認して送る -->
   <div class="step" id="s5">
-    <div class="card msg">
-      <div class="tag">STEP 5 / 6</div>
-      <h2>📸 写メ日記「おまかせ併用」のお願い</h2>
-      <p>お客様が「今日だれに会おう？」と探しているのは、<b>接客中で日記が書けない時間</b>だったりします。<br>
-        お店で調べたら、日記が出ていなかった時間に日記を出すようにしたところ、<b>その時間の予約が増えました</b>。</p>
-      <ul>
-        <li>ふだんの日記は、今までどおり自分で書いてOK</li>
-        <li>アプリが出すのは、<b>接客中で、しばらく日記が出ていない時だけ</b></li>
-        <li>「何時から会えるか」はお店の記録を見るので、予約とずれません</li>
-        <li>書き方は、あなたの日記に合わせます（呼び方・記号・顔文字）</li>
-        <li>体のことやサービスの中身は書きません</li>
-        <li>やめたい時は、お店に一言でストップできます</li>
-      </ul>
-      <div class="hpnote"><b>💡 おすすめの使い分け</b><br>
-        出勤・退勤・「何時から空いてるよ」のような<b>かんたんな日記はアプリにおまかせ</b>してもらえると、日記の数が増えて、予約やアクセスにつながりやすくなります。<br>
-        <b>お礼日記や自分のお話は、今までどおりご自身で</b>書いてください。自分で書いた方がリアルで、ぜったいに良いです。</div>
-      <div class="hint" style="margin-bottom:6px">こんな日記が出ます（実際はあなたの言葉づかいに合わせて、毎回ちがう文になります）</div>
-      <div style="background:var(--pink-bg);border-radius:10px;padding:8px 12px;font-size:13px;white-space:pre-wrap">ちょっとバタバタしてたけど
-21時からまた会えます！
-今日はまだいるので、気軽に声かけてね★</div>
-      <p class="hint" style="margin-top:6px">ヘブンへの設定はお店でやります。あなたの携帯からの投稿も、今までどおり使えます。</p>
-    </div>
     <div class="card">
-      <label class="f" style="margin-top:0">① 協力してもらえますか？ <span style="color:var(--error)">＊</span></label>
-      <div id="dAgree"></div>
-      <div id="dMore">
-        <label class="f">② 日記に使っていい写真 <span style="color:var(--error)">＊</span></label>
-        <div id="dPhoto"></div>
-        <input type="text" id="dPhotoNote" maxlength="200" placeholder="隠したい所があれば（例：顔は口元まで・タトゥーはぼかして）。お店でぼかします" style="margin-top:6px">
-
-        <label class="f">③ 書き方のクセ（わかる範囲で）</label>
-        <div class="hint">空いているところがあっても大丈夫です。今までの日記から、お店で合わせます。</div>
-        <label class="f">自分の呼び方</label>
-        <input type="text" id="dSelfName" maxlength="60" placeholder="例：○○（名前）／わたし／うち">
-        <label class="f">口ぐせ・語尾</label>
-        <input type="text" id="dEndings" maxlength="200" placeholder="例：〜だよ♪／〜ですっ／〜なの！">
-        <label class="f">よく使う記号</label>
-        <input type="text" id="dSymbols" maxlength="100" placeholder="例：♡ ☆ ♪ ★ ！！">
-        <label class="f">よく使う絵文字</label>
-        <input type="text" id="dEmoji" maxlength="100" placeholder="例：🥰 💕 ✨ 🍓">
-        <label class="f">よく使う顔文字</label>
-        <input type="text" id="dKaomoji" maxlength="100" placeholder="例：(*^^*) (´∀｀) ( ˘ω˘ )">
-
-        <label class="f">④ 日記に書いてほしくないこと <span style="color:var(--error)">＊</span></label>
-        <textarea id="dNg" maxlength="1000" placeholder="例：「寂しい」系の言葉は使わないで／地元の話はNG（なければ「なし」）"></textarea>
-
-        <label class="f">⑤ 最近あったこと（日記の話のたねにします）</label>
-        <textarea id="dRecent" maxlength="1000" placeholder="例：新しいネイルにした／○○のカフェに行った／寒くなってきたので鍋ばかり食べてる"></textarea>
-        <div class="hint">これからも、ときどき一言もらえるとうれしいです（行った場所・食べたものなど）。</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 6：確認して送る -->
-  <div class="step" id="s6">
-    <div class="card">
-      <div class="tag">STEP 6 / 6</div>
+      <div class="tag">STEP 5 / 5</div>
       <h2>確認して送る</h2>
       <div class="desc">内容を確認して「送る」を押してください。</div>
       <div class="sum" id="summary"></div>
@@ -290,7 +235,7 @@ const OPT_CHOICES = {
   '女装レズコース':       { '◎': 'OK', '×': 'NG' },
 };
 const choicesOf = k => OPT_CHOICES[k] ? Object.keys(OPT_CHOICES[k]) : ['◎','○','△','×'];
-const STEPS = 6;
+const STEPS = 5;
 let cur = 0, info = null;
 // 紹介文：self＝自己紹介文（本人から一言）／mgr＝店長紹介文。want：'' 未選択・'keep' このままでOK・'change' 変えたい
 const INTRO = [
@@ -299,12 +244,7 @@ const INTRO = [
   { k: 'mgr', hp: 'mgrComment', title: '📝 店長紹介文（店長から一言）', ask: 'こういう内容で書いてほしい、という希望を書いてください（単語・入れてほしいフレーズなどでOK）',
     ph: '例：「癒し系」「笑顔」を入れてほしい／趣味のゲームの話を入れてほしい／最新のSNSフォロワー数に直してほしい' },
 ];
-// 写メ日記おまかせ投稿（社長の自動投稿アプリ用）：agree＝ok／later（話を聞いてから）／no
-const DIARY_AGREE = [['ok', '協力する（OK）'], ['later', 'もう少し話を聞いてから決めたい'], ['no', '今回はやめておく']];
-const DIARY_PHOTO = [['old', '今までの写メ日記の写真から、お店で選んでOK'], ['send', '使ってほしい写真を2〜3枚、LINEで内勤に送る']];
-const DIARY_TEXT = { dPhotoNote: 'photoNote', dSelfName: 'selfName', dEndings: 'endings', dSymbols: 'symbols', dEmoji: 'emoji', dKaomoji: 'kaomoji', dNg: 'ng', dRecent: 'recent' };
-const emptyDiary = () => ({ agree: '', photo: '', photoNote: '', selfName: '', endings: '', symbols: '', emoji: '', kaomoji: '', ng: '', recent: '' });
-let st = { profile: {}, intro: { self: { want: '', text: '' }, mgr: { want: '', text: '' } }, options: {}, optMemo: {}, popts: [], announce: [], interval: '', longMax: '', longOver: '', hotel: '', notes: '', pq: {}, diary: emptyDiary() };
+let st = { profile: {}, intro: { self: { want: '', text: '' }, mgr: { want: '', text: '' } }, options: {}, optMemo: {}, popts: [], announce: [], interval: '', longMax: '', longOver: '', hotel: '', notes: '', pq: {} };
 
 /* ---------- 読みこみ ---------- */
 async function load(){
@@ -348,7 +288,6 @@ function fillTest(){
   if(!st.announce.length) st.announce = ['なし'];
   st.interval = st.interval || '0'; st.longMax = st.longMax || '0'; st.notes = st.notes || 'なし';
   PQ_QUESTIONS.forEach(q => { if(!pqDone(q.n)){ const c = pick(['A', 'B']); st.pq[q.n] = { choice: c, text: c === 'A' ? q.a : q.b }; } });
-  st.diary = Object.assign(emptyDiary(), st.diary, { agree: st.diary.agree || 'ok', photo: st.diary.photo || 'old', ng: st.diary.ng || 'なし' });
   saveDraft(); build(); go(STEPS);
 }
 function fatal(m){ $('loading').style.display = 'none'; const f = $('fatal'); f.style.display = ''; f.textContent = m; }
@@ -359,7 +298,7 @@ function fromSaved(d){
            options: d.options || {}, optMemo: d.optMemo || {},
            popts: d.personalOptions || [], announce: d.mustAnnounce || [], interval: d.interval == null ? '' : String(d.interval),
            longMax: d.longMax == null ? '' : String(d.longMax), longOver: d.longOver || '',
-           hotel: d.hotel || '', notes: d.notes || '', pq, diary: Object.assign(emptyDiary(), d.diary || {}) };
+           hotel: d.hotel || '', notes: d.notes || '', pq };
 }
 function saveDraft(){ try{ localStorage.setItem(DRAFT_KEY, JSON.stringify({ savedAt: Date.now(), st })); }catch(e){} }
 
@@ -404,18 +343,6 @@ function build(){
   if(st.longOver) $('lo_' + st.longOver).checked = true;
   longOverShow();
 
-  // 写メ日記
-  st.diary = Object.assign(emptyDiary(), st.diary || {});
-  const radios = (name, list, key) => list.map(([v, l]) => `<label class="o" style="display:flex;gap:8px;align-items:flex-start;padding:8px;border-radius:10px;border:1.5px solid var(--pink-soft);margin-top:6px;font-size:14px;cursor:pointer">
-      <input type="radio" name="${name}" value="${v}" ${st.diary[key] === v ? 'checked' : ''} style="margin-top:5px" onchange="setDiary('${key}','${v}')"><span>${esc(l)}</span></label>`).join('');
-  $('dAgree').innerHTML = radios('dAgreeR', DIARY_AGREE, 'agree');
-  $('dPhoto').innerHTML = radios('dPhotoR', DIARY_PHOTO, 'photo');
-  Object.entries(DIARY_TEXT).forEach(([id, k]) => {
-    $(id).value = st.diary[k] || '';
-    $(id).addEventListener('input', e => { st.diary[k] = e.target.value; e.target.classList.remove('miss'); saveDraft(); });
-  });
-  diaryShow();
-
   $('pqTotal').textContent = PQ_QUESTIONS.length;
   $('pqList').innerHTML = PQ_QUESTIONS.map(q => {
     const a = st.pq[q.n] || {};
@@ -428,8 +355,6 @@ function build(){
   pqCount();
 }
 function setIntro(k, v){ st.intro[k].want = v; $('ib_' + k).style.display = v === 'change' ? '' : 'none'; $('in_' + k).classList.remove('miss'); saveDraft(); }
-function setDiary(k, v){ st.diary[k] = v; $(k === 'agree' ? 'dAgree' : 'dPhoto').classList.remove('miss'); diaryShow(); saveDraft(); }
-function diaryShow(){ $('dMore').style.display = st.diary.agree === 'ok' ? '' : 'none'; }   // ②〜⑤は「協力する」のときだけ
 function longOverShow(){ $('longOverBox').style.display = (st.longMax && st.longMax !== '0') ? '' : 'none'; }
 function renderPopts(){
   $('popts').innerHTML = st.popts.map((p, i) => `<div class="list-item">
@@ -498,14 +423,6 @@ function check(n){
     const q = PQ_QUESTIONS.find(x => !pqDone(x.n));
     if(q) return { msg: 'Q' + q.n + ' がまだです' + (st.pq[q.n] && st.pq[q.n].choice === 'C' ? '（Cを選んだら、自由回答に書いてください）' : ''), el: $('pq' + q.n) };
   }
-  if(n === 5){
-    const d = st.diary;
-    if(!d.agree) return { msg: '写メ日記：「協力してもらえますか？」を選んでください', el: $('dAgree') };
-    if(d.agree === 'ok'){
-      if(!d.photo) return { msg: '写メ日記：使っていい写真を選んでください', el: $('dPhoto') };
-      if(!(d.ng || '').trim()) return { msg: '写メ日記：「書いてほしくないこと」を書いてください（なければ「なし」）', el: $('dNg') };
-    }
-  }
   return null;
 }
 
@@ -526,7 +443,6 @@ function payload(){
     hotel: st.hotel.trim(), notes: st.notes.trim(),
     personalityAnswers: { list: PQ_QUESTIONS.map(q => ({ n: q.n, q: q.q, choice: (st.pq[q.n] || {}).choice || '', text: (st.pq[q.n] || {}).text || '' })), axisSummary: r.axisResults },
     personalityType: r.typeCode,
-    diary: st.diary.agree === 'ok' ? Object.fromEntries(Object.entries(st.diary).map(([k, v]) => [k, String(v || '').trim()])) : { agree: st.diary.agree },
     hpProfile: info.hp ? info.hp.fields : null, hpOptions: info.hp ? info.hp.options : null,   // 照らし合わせ用（そのときの公式HP）
     submittedAt: new Date().toISOString(),
   };
@@ -544,13 +460,6 @@ function summaryText(){
   lines.push('', '【長いコース】', p.longMax ? p.longMax + '分まで（それより長いのは' + (p.longOver === 'ng' ? '受けない' : '確認してから') + '）' : '何分でもOK');
   lines.push('', '【ホテルの希望】', p.hotel || '（なし）', '', '【電話受付外でのご要望】', p.notes);
   lines.push('', '【性格タイプチェック】', PQ_QUESTIONS.filter(q => pqDone(q.n)).length + ' / ' + PQ_QUESTIONS.length + ' 問 回答済み');
-  const d = p.diary, lab = (list, v) => (list.find(x => x[0] === v) || [, ''])[1];
-  lines.push('', '【写メ日記おまかせ併用】', lab(DIARY_AGREE, d.agree));
-  if(d.agree === 'ok'){
-    lines.push('写真：' + lab(DIARY_PHOTO, d.photo) + (d.photoNote ? '（' + d.photoNote + '）' : ''));
-    [['自分の呼び方', 'selfName'], ['口ぐせ・語尾', 'endings'], ['よく使う記号', 'symbols'], ['よく使う絵文字', 'emoji'], ['よく使う顔文字', 'kaomoji'],
-     ['書いてほしくないこと', 'ng'], ['最近あったこと', 'recent']].forEach(([l, k]) => { if(d[k]) lines.push(l + '：' + d[k]); });
-  }
   return lines.join('\n');
 }
 let sending = false;
