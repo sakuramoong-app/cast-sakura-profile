@@ -700,7 +700,19 @@ let personalityAnswers = {}; // n -> {choice:'A'|'B'|'C', text:'選択肢の文�
 // =========================================================
 //  初期化
 // =========================================================
+// 出しなおし用のURL（?t=…）：その子のプロフを書きかえる
+const FORM_TOKEN = (new URLSearchParams(location.search).get('t') || '').replace(/[^0-9a-f]/gi, '').slice(0, 64);
+
 function init() {
+  if (FORM_TOKEN) {
+    const first = document.querySelector('.step');
+    if (first) {
+      const note = document.createElement('div');
+      note.style.cssText = 'background:#FFF0F5;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:13px;line-height:1.7';
+      note.textContent = '🔁 出しなおし用のURLです。提出すると、前に出したプロフが新しい内容になります。';
+      first.prepend(note);
+    }
+  }
   buildOpts();
   buildVibes();
   buildPersonalityQuiz();
@@ -1031,7 +1043,9 @@ ${internal}`;
 // =========================================================
 //  提出
 // =========================================================
-function submitForm() {
+async function submitForm() {
+  const btn = document.querySelector('.btn-submit');
+  if (btn && btn.disabled) return;
   const name = document.getElementById('f-name').value || 'キャスト';
 
   // フォームデータを収集してLocalStorageに保存
@@ -1082,6 +1096,7 @@ function submitForm() {
     optMemo:     optMemoNamed,
     personalityType:    pqResult.typeCode,
     personalityAnswers: personalityAnswersOut,
+    t:           FORM_TOKEN,
     status:      'new',
     colorIdx:    Math.floor(Math.random() * 8),
     submittedAt: new Date().toISOString()
@@ -1095,7 +1110,13 @@ function submitForm() {
   // Google Sheets送信（GAS URLが設定されていれば送信）
   const GAS_URL = 'https://script.google.com/macros/s/AKfycbzi57Ov9kuxR9dP4nHk3nMg3usGF4XCPqYmt_sJ8CrXAFbD6vUSVIP7PUsRSgOwFsP_/exec';
   if (GAS_URL) {
-    sendToGAS(castData, GAS_URL);
+    if (btn) { btn.disabled = true; btn.textContent = '送っています…'; }
+    const res = await sendToGAS(castData, GAS_URL);
+    if (btn) { btn.disabled = false; btn.textContent = '✉️ 内勤に提出する'; }
+    if (!res || res.result !== 'ok') {
+      alert((res && res.message) || '送れませんでした。電波のよい所で、もう一度「内勤に提出する」を押してください。');
+      return;
+    }
   }
 
   document.getElementById('complete-name').textContent = `${name} さんのプロフ、受け取りました！`;
@@ -1107,13 +1128,15 @@ async function sendToGAS(data, url) {
     // FormDataで送信（no-corsでも確実に届く方式）
     const form = new FormData();
     form.append('payload', JSON.stringify(data));
-    await profFetch(url, {
+    const r = await profFetch(url, {
       method: 'POST',
       mode: 'no-cors',
       body: form
     });
+    return await r.json();
   } catch(e) {
     console.warn('GAS送信エラー:', e);
+    return null;
   }
 }
 
