@@ -444,10 +444,17 @@ body::before{
       </div>
       <div class="field">
         <label class="field-label">タバコ<span class="req">必須</span></label>
-        <div class="radio-group">
-          <label><input type="radio" name="tabako" value="喫煙者"> 喫煙者</label>
-          <label><input type="radio" name="tabako" value="非喫煙者"> 非喫煙者</label>
-          <label><input type="radio" name="tabako" value="電子タバコのみ"> 電子のみ</label>
+        <div class="radio-group" onchange="var t = document.querySelector('input[name=tabako]:checked'); document.getElementById('tabakoNote').style.display = t && t.value !== '非喫煙者' ? '' : 'none'">
+          <label><input type="radio" name="tabako" value="非喫煙者"> 吸わない</label>
+          <label><input type="radio" name="tabako" value="喫煙者（紙）"> 紙タバコ</label>
+          <label><input type="radio" name="tabako" value="電子タバコのみ"> 電子タバコ</label>
+          <label><input type="radio" name="tabako" value="喫煙者（紙・電子）"> 紙と電子の両方</label>
+        </div>
+        <!-- 吸う人へのお願い（吸うを選んだら出す） -->
+        <div id="tabakoNote" style="display:none;margin-top:8px;background:#FFF4E5;border:1.5px solid #FFB547;border-radius:12px;padding:8px 12px;font-size:13px;line-height:1.7;color:#7a4a00">
+          🚬 <b>タバコを吸う方へのお願い</b><br>
+          待機しているキャストさんの中には、体質的にタバコの煙がどうしても苦手な子がいます。<br>
+          待機場では、<b>決められた喫煙場所</b>で吸うようにお願いします🙏
         </div>
       </div>
     </div>
