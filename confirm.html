@@ -186,6 +186,13 @@ select{font:inherit;font-size:16px;border:1.5px solid var(--border);border-radiu
       <div class="desc">内容を確認して「送る」を押してください。</div>
       <div class="sum" id="summary"></div>
     </div>
+    <div class="card">
+      <h2>📷 写真を出す（ある人だけ）</h2>
+      <div class="desc">スタジオなどで撮った写真があれば、ここから送ってください。<b>元の大きさのまま</b>届きます（10枚まで）。「送る」を押すと、答えといっしょに送られます。</div>
+      <label class="btn btn-g" style="display:inline-block;margin-top:8px;cursor:pointer">📁 写真を選ぶ<input type="file" id="phPick" accept="image/*" multiple style="display:none" onchange="phAdd(this.files);this.value=''"></label>
+      <div id="phList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px;margin-top:10px"></div>
+      <div class="hint" id="phNote"></div>
+    </div>
   </div>
 
   <!-- 送った -->
@@ -460,16 +467,50 @@ function summaryText(){
   lines.push('', '【長いコース】', p.longMax ? p.longMax + '分まで（それより長いのは' + (p.longOver === 'ng' ? '受けない' : '確認してから') + '）' : '何分でもOK');
   lines.push('', '【ホテルの希望】', p.hotel || '（なし）', '', '【電話受付外でのご要望】', p.notes);
   lines.push('', '【性格タイプチェック】', PQ_QUESTIONS.filter(q => pqDone(q.n)).length + ' / ' + PQ_QUESTIONS.length + ' 問 回答済み');
+  if(phFiles.length) lines.push('', '【写真】', phFiles.length + '枚（下の「📷 写真を出す」）');
   return lines.join('\n');
+}
+/* ---------- 📷 写真（元の大きさのまま。送るときに入れる） ---------- */
+const PH_MAX = 10;
+let phFiles = [];
+function phAdd(files){
+  const list = [...files].filter(f => /^image\//.test(f.type) || /\.(heic|heif)$/i.test(f.name));
+  const room = PH_MAX - phFiles.length;
+  if(list.length > room) alert('写真は' + PH_MAX + '枚までです（' + (list.length - room) + '枚は入れていません）');
+  list.slice(0, Math.max(0, room)).forEach(f => phFiles.push({ f, url: URL.createObjectURL(f) }));
+  phPaint();
+}
+function phDel(i){ URL.revokeObjectURL(phFiles[i].url); phFiles.splice(i, 1); phPaint(); }
+function phPaint(){
+  $('phList').innerHTML = phFiles.map((p, i) => `<div style="position:relative"><img src="${p.url}" alt="" style="width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:10px;background:#f3eef0">
+    <button type="button" onclick="phDel(${i})" style="position:absolute;top:4px;right:4px;border:none;border-radius:99px;background:rgba(0,0,0,.55);color:#fff;width:26px;height:26px;font-size:14px;cursor:pointer">×</button></div>`).join('');
+  const mb = phFiles.reduce((a, p) => a + p.f.size, 0) / 1048576;
+  $('phNote').textContent = phFiles.length ? phFiles.length + '枚（' + mb.toFixed(1) + 'MB）を「送る」でいっしょに送ります' : '';
+}
+async function phUpload(){
+  const out = [];
+  for(let i = 0; i < phFiles.length; i++){
+    const f = phFiles[i].f, ext = ((f.name.match(/\.([a-z0-9]+)$/i) || [])[1] || 'jpg').toLowerCase();
+    $('next').textContent = '写真を送っています… ' + (i + 1) + ' / ' + phFiles.length;
+    const path = TOKEN + '/' + Date.now() + '_' + (i + 1) + '.' + ext;
+    const { error } = await sb.storage.from('cast-form-photos').upload(path, f, { contentType: f.type || 'image/jpeg', upsert: false });
+    if(error) throw new Error('写真（' + (i + 1) + '枚目）を送れませんでした：' + error.message);
+    out.push({ path, name: f.name, size: f.size });
+  }
+  return out;
 }
 let sending = false;
 async function submit(){
   if(sending) return; sending = true; $('next').disabled = true; $('next').textContent = '送っています…';
   try{
-    const { data, error } = await sb.rpc('prof_confirm_submit', { p_token: TOKEN, p: payload() });
+    const p = payload();
+    if(phFiles.length) p.photos = await phUpload();   // 写真を先に入れて、答えに「どの写真か」を書いておく
+    $('next').textContent = '送っています…';
+    const { data, error } = await sb.rpc('prof_confirm_submit', { p_token: TOKEN, p });
     if(error) throw error;
     if(!data || data.result !== 'ok') throw new Error((data && data.message) || '送れませんでした');
     try{ localStorage.removeItem(DRAFT_KEY); }catch(e){}
+    phFiles.forEach(x => URL.revokeObjectURL(x.url)); phFiles = []; phPaint();
     info.submittedAt = new Date().toISOString();
     go('done');
   }catch(e){ alert('送れませんでした：' + (e.message || e) + '\n電波のよいところで、もう一度「送る」を押してください。'); }
