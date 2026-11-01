@@ -12,6 +12,7 @@
   const SUPABASE_URL = "https://tuxqpqokbvkrckgxcfdn.supabase.co";
   const SUPABASE_KEY = "sb_publishable_PyvCZHSzYlaqauYbdZybng_zbftghak";
   const STAFF_EMAIL = 'naikin@sakuramoong.internal';
+  const staffOk = s => { try{ if(String(s.user.email || '').toLowerCase() === STAFF_EMAIL) return true; let p = String(s.access_token || '').split('.')[1].replace(/-/g, '+').replace(/_/g, '/'); while(p.length % 4) p += '='; return ['staff', 'manager', 'owner'].includes(JSON.parse(decodeURIComponent(escape(atob(p)))).staff_role); }catch(e){ return false; } };   // 共通アカウント、または内勤の一覧のGoogleアカウント（SQL 192）
   const STAFF_HOURS = 20;
 
   const ROLE = (window.PROF_DB_ROLE === 'cast') ? 'cast' : 'staff';
@@ -35,7 +36,7 @@
     try{
       const { data } = await sb.auth.getSession();
       const s = data && data.session;
-      if(!s || !s.user || String(s.user.email || '').toLowerCase() !== STAFF_EMAIL) return null;
+      if(!s || !s.user || !staffOk(s)) return null;
       return Date.now() < sessionExpiresAt(s) ? s : null;
     }catch(e){ return null; }
   }
