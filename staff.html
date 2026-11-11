@@ -1938,7 +1938,7 @@ function renderLogPanel(cast) {
         <span style="font-size:11px;font-weight:700;color:var(--pink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(logTypeLabel(l.type))}</span>
         <span style="font-size:10.5px;color:var(--text2);white-space:nowrap;flex-shrink:0">${esc(l.date || '')}</span>
       </div>
-      ${l.author ? `<div style="font-size:10.5px;font-weight:700;color:${mk.color};margin-bottom:3px">${mk.emoji} ${esc(l.author)}</div>` : ''}
+      ${l.author ? `<div style="font-size:10.5px;font-weight:700;color:${mk.color};margin-bottom:3px">${siEm(mk)} ${esc(l.author)}</div>` : ''}
       ${l.reservationDate ? `<div style="font-size:11px;color:var(--text2);margin-bottom:4px">予約日時：${esc(l.reservationDate)}</div>` : ''}
       <div class="log-view">
         <div style="font-size:14px;color:var(--text);white-space:pre-wrap;line-height:1.6">${esc(l.content || '')}</div>
@@ -2045,6 +2045,7 @@ const STAFF_MARKS = {
   'わか': { emoji: '🦉', color: '#8a6fd1', bg: '#f6f2fe' },
 };
 if (window.StaffIcons) StaffIcons.patch(STAFF_MARKS);   // 👤 記録簿の「自分のアイコン」で変えたもの（全アプリ共通）
+const siEm = o => (window.StaffIcons && StaffIcons.html) ? StaffIcons.html(o) : ((o && o.emoji) || "");   // 👤 Googleの写真にした人は写真（なければ絵文字）
 function staffMark(name) { return STAFF_MARKS[name] || { emoji: '🌸', color: '#c9556a', bg: '#FDF3F5' }; }
 // ポータルで選んでいる担当者
 function currentOperatorName() { try { return localStorage.getItem('currentOperator') || ''; } catch (e) { return ''; } }
