@@ -2044,6 +2044,7 @@ const STAFF_MARKS = {
   'かみ': { emoji: '🌙', color: '#3b5bdb', bg: '#f0f3fe' },
   'わか': { emoji: '🦉', color: '#8a6fd1', bg: '#f6f2fe' },
 };
+if (window.StaffIcons) StaffIcons.patch(STAFF_MARKS);   // 👤 記録簿の「自分のアイコン」で変えたもの（全アプリ共通）
 function staffMark(name) { return STAFF_MARKS[name] || { emoji: '🌸', color: '#c9556a', bg: '#FDF3F5' }; }
 // ポータルで選んでいる担当者
 function currentOperatorName() { try { return localStorage.getItem('currentOperator') || ''; } catch (e) { return ''; } }
